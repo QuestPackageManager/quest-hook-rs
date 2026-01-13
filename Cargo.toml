@@ -33,7 +33,7 @@ tracing-subscriber = { version = "0.3", features = [
 ], default-features = false, optional = true }
 
 [features]
-default = ["util", "cache"]
+default = ["util", "cache", "il2cpp_v31", "bindgen"]
 il2cpp_v31 = ["libil2cpp/il2cpp_v31"]
 il2cpp_v29 = ["libil2cpp/il2cpp_v29"]
 il2cpp_v24 = ["libil2cpp/il2cpp_v24"]
@@ -42,6 +42,7 @@ util = ["tracing", "tracing-error", "tracing-subscriber", "paranoid-android"]
 cache = ["libil2cpp/cache"]
 serde = ["libil2cpp/serde"]
 trace = ["libil2cpp/trace"]
+bindgen = ["libil2cpp/bindgen"]
 
 [[example]]
 name = "hello_world"

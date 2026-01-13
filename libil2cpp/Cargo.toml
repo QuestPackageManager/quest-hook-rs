@@ -11,7 +11,7 @@ edition = "2021"
 
 [dependencies]
 quest_hook_proc_macros = { path = "../proc_macros" }
-libloading = "0.8"
+libloading = "0.9"
 thiserror = "2"
 paste = "1"
 serde = { version = "1", optional = true }
@@ -28,8 +28,10 @@ il2cpp_v31 = []
 il2cpp_v29 = []
 il2cpp_v24 = []
 unity2018 = []
+# whether to use bindgen to generate bindings at build time
+bindgen = ["dep:bindgen"]
 cache = []
 trace = ["tracing"]
 
 [build-dependencies]
-bindgen = "0.71.1"
+bindgen = { version = "0.72", optional = true }
