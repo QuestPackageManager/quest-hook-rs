@@ -16,6 +16,15 @@ fn run_bindgen() {
     #[cfg(feature = "il2cpp_v31")]
     let version = "0.4.0";
 
+    #[cfg(not(any(feature = "il2cpp_v29", feature = "il2cpp_v31")))]
+    compile_error!("No il2cpp version feature enabled: enable one of 'il2cpp_v29' or 'il2cpp_v31'");
+
+    let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    println!(
+        "cargo:rustc-link-search={}/extern/includes/libil2cpp/il2cpp/libil2cpp",
+        manifest.display()
+    );
+
     // qpm dependency add libil2cpp --version {version}
     // qpm restore
     Command::new("qpm")
@@ -26,10 +35,14 @@ fn run_bindgen() {
     println!("cargo:rerun-if-changed=wrapper.h");
     let bindings = bindgen::Builder::default()
         .header("wrapper.h")
-        .clang_arg("-I./extern/includes/libil2cpp/il2cpp/libil2cpp")
+        .clang_arg(format!("-I{}", manifest.join("extern/includes/libil2cpp/il2cpp/libil2cpp").display()))
+        .clang_arg(format!("-I{}", manifest.join("extern/includes/libil2cpp/il2cpp/external/baselib/Include").display()))
+        .clang_arg(format!("-I{}", manifest.join("extern/includes/libil2cpp/il2cpp/external/baselib/Platforms/Android/Include").display()))
+        .clang_arg(format!("-I{}", manifest.join("extern/includes").display()))
+        .clang_arg(format!("-I{}", manifest.display()))
         .clang_arg("-v")
         .wrap_unsafe_ops(true)
-        .sort_semantically(true) // Incluye las cabeceras si es necesario
+        .sort_semantically(true)
         .generate()
         .expect("Unable to generate bindings");
 
