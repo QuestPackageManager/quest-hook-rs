@@ -1,10 +1,7 @@
 use std::fmt;
 use std::ops::DerefMut;
 
-use crate::{
-    raw, Argument, Arguments, Gc, Il2CppClass, Il2CppException, Returned, ThisArgument, Type,
-    WrapRaw,
-};
+use crate::{raw, Argument, Arguments, Gc, Il2CppClass, Returned, Type, WrapRaw};
 
 /// An il2cpp object
 #[repr(transparent)]
@@ -22,11 +19,7 @@ impl Il2CppObject {
     /// # Panics
     ///
     /// This method will panic if a matching method can't be found.
-    pub fn invoke<A, R, const N: usize>(
-        &mut self,
-        name: &str,
-        args: A,
-    ) -> crate::Result<R>
+    pub fn invoke<A, R, const N: usize>(&mut self, name: &str, args: A) -> crate::Result<R>
     where
         A: Arguments<N>,
         R: Returned,
@@ -41,11 +34,7 @@ impl Il2CppObject {
     /// # Panics
     ///
     /// This method will panic if a matching method can't be found.
-    pub fn invoke_void<A, const N: usize>(
-        &mut self,
-        name: &str,
-        args: A,
-    ) -> crate::Result<()>
+    pub fn invoke_void<A, const N: usize>(&mut self, name: &str, args: A) -> crate::Result<()>
     where
         A: Arguments<N>,
     {
@@ -117,8 +106,12 @@ where
 {
 }
 
+/// Trait for types that can be treated as ``Il2CppObject``
+/// Useful for generic constraints and supporting multiple object-like types
 pub trait ObjectType {
+    /// Returns a reference to the underlying ``Il2CppObject``
     fn as_object(&self) -> &Il2CppObject;
+    /// Returns a mutable reference to the underlying ``Il2CppObject``
     fn as_object_mut(&mut self) -> &mut Il2CppObject;
 }
 

@@ -105,7 +105,7 @@ where
     T: AsRef<str>,
 {
     fn eq(&self, other: &T) -> bool {
-        self.to_string().map_or(false, |s| s == other.as_ref())
+        self.to_string().is_ok_and(|s| s == other.as_ref())
     }
 }
 

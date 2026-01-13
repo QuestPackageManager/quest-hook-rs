@@ -12,7 +12,6 @@ mod functions;
 #[cfg_attr(feature = "unity2018", path = "types_2018.rs")]
 mod types;
 
-/// 
 #[cfg(feature = "bindgen")]
 #[path = "bindgen.rs"]
 mod types;
@@ -22,7 +21,7 @@ pub use types::*;
 
 use std::mem::{size_of, transmute};
 
-use crate::{ThisArgument, Type};
+use crate::Type;
 
 /// Safe wrapper around a raw il2cpp type which can be used in its place
 ///
@@ -102,7 +101,11 @@ pub unsafe fn unbox<T>(object: &Il2CppObject) -> T {
     ptr.read_unaligned()
 }
 
+/// Boxes a value type into an [`Il2CppObject`]
+/// # Safety
+/// The provided value must be a valid value of the given type.
 #[inline]
 pub unsafe fn value_box<T: Type>(this: &mut T) -> *mut T {
+    todo!("boxing value types is not yet implemented");
     this as *mut T
 }

@@ -1,5 +1,5 @@
 use std::backtrace::Backtrace;
-use std::panic::PanicInfo;
+use std::panic::PanicHookInfo;
 
 use cfg_if::cfg_if;
 use tracing::error;
@@ -26,7 +26,7 @@ pub fn setup(tag: impl ToString) {
 pub fn panic_hook(
     backtrace: bool,
     spantrace: bool,
-) -> Box<dyn Fn(&PanicInfo<'_>) + Send + Sync + 'static> {
+) -> Box<dyn Fn(&PanicHookInfo<'_>) + Send + Sync + 'static> {
     // Mostly taken from https://doc.rust-lang.org/src/std/panicking.rs.html
     Box::new(move |info| {
         let location = info.location().unwrap();

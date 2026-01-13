@@ -14,7 +14,7 @@ use crate::raw::{
     Il2CppTypeEnum_IL2CPP_TYPE_U2, Il2CppTypeEnum_IL2CPP_TYPE_U4, Il2CppTypeEnum_IL2CPP_TYPE_U8,
     Il2CppTypeEnum_IL2CPP_TYPE_VOID,
 };
-use crate::{raw, Generics, Il2CppClass, Il2CppException, Il2CppObject, WrapRaw};
+use crate::{raw, Gc, Generics, Il2CppClass, Il2CppException, Il2CppObject, WrapRaw};
 
 /// An il2cpp type
 #[repr(transparent)]
@@ -78,7 +78,7 @@ impl fmt::Debug for Il2CppType {
 
 impl fmt::Display for Il2CppType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&*self.name())
+        f.write_str(&self.name())
     }
 }
 
@@ -184,7 +184,7 @@ impl Il2CppReflectionType {
 
     /// Instanciates a generic type template with the provided generic
     /// arguments
-    pub fn make_generic<G>(&self) -> Result<Option<&Self>, &mut Il2CppException>
+    pub fn make_generic<G>(&self) -> Result<Option<&Self>, Gc<Il2CppException>>
     where
         G: Generics,
     {
@@ -206,7 +206,7 @@ impl Il2CppReflectionType {
         let obj = match ret {
             Ok(Some(obj)) => obj,
             Ok(None) => return Ok(None),
-            Err(e) => return Err(unsafe { Il2CppException::wrap_mut(e) }),
+            Err(e) => return Err(unsafe { Gc::from(Il2CppException::wrap_mut(e)) }),
         };
         let ty = unsafe { &mut *(obj as *mut raw::Il2CppObject).cast() };
         Ok(Some(ty))

@@ -33,7 +33,7 @@ impl Hook {
             flamingo_c_api::flamingo_install_hook_no_name(
                 hook as *mut c_void,
                 target as *mut u32,
-                &mut original
+                &mut original,
             )
         };
 

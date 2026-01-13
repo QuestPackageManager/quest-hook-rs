@@ -1,5 +1,4 @@
 use std::fmt::{self, Debug, Formatter};
-use std::mem::transmute;
 use std::ops::{Deref, DerefMut, Not};
 
 use crate::{Argument, ObjectType, Returned, ThisArgument, Type};

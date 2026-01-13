@@ -2,7 +2,6 @@ use std::borrow::Cow;
 use std::ffi::{c_void, CStr};
 use std::mem::transmute;
 use std::ops::{Deref, DerefMut};
-use std::sync::{Arc, Mutex};
 use std::{fmt, slice};
 
 use crate::raw::{METHOD_ATTRIBUTE_ABSTRACT, METHOD_ATTRIBUTE_STATIC, METHOD_ATTRIBUTE_VIRTUAL};
@@ -25,7 +24,9 @@ pub struct MethodInfo(raw::MethodInfo);
 unsafe impl Send for MethodInfo {}
 unsafe impl Sync for MethodInfo {}
 
+/// Alias for `()` to represent `void` return type
 pub type Void = ();
+/// Result type for method invocations
 pub type Result<T> = std::result::Result<T, Gc<Il2CppException>>; // Gc<T> adds Sync and Send bounds, allowing for async support
 
 impl MethodInfo {

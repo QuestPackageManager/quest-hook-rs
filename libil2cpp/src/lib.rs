@@ -1,4 +1,4 @@
-#![feature( never_type)]
+#![feature(never_type)]
 #![feature(trait_alias)]
 #![doc(html_root_url = "https://stackdoubleflow.github.io/quest-hook-rs/libil2cpp")]
 #![warn(
@@ -50,6 +50,8 @@
     clippy::string_add_assign,
     clippy::string_add,
     clippy::string_lit_as_bytes,
+    clippy::mut_from_ref,
+    clippy::missing_transmute_annotations,
     clippy::todo,
     clippy::trait_duplication_in_bounds,
     clippy::unimplemented,
@@ -71,7 +73,12 @@
 
 //! Wrappers and raw bindings for Unity's libil2cpp
 
-#[cfg(not(any(feature = "il2cpp_v31", feature = "il2cpp_v29", feature = "il2cpp_v24", feature = "unity2018")))]
+#[cfg(not(any(
+    feature = "il2cpp_v31",
+    feature = "il2cpp_v29",
+    feature = "il2cpp_v24",
+    feature = "unity2018"
+)))]
 compile_error!("No Unity version selected");
 
 #[cfg(feature = "trace")]
@@ -88,14 +95,14 @@ macro_rules! debug {
 pub use quest_hook_proc_macros::identity as instrument;
 
 mod array;
+mod byref;
 mod class;
 mod exception;
 mod field_info;
+mod gc;
 mod method_info;
 mod object;
 mod valuetype;
-mod byref;
-mod gc;
 
 #[cfg_attr(
     any(feature = "unity2018", feature = "il2cpp_v24"),
@@ -112,9 +119,11 @@ mod typecheck;
 pub use quest_hook_proc_macros::{unsafe_impl_reference_type, unsafe_impl_value_type};
 
 pub use array::Il2CppArray;
+pub use byref::{ByRef, ByRefMut};
 pub use class::{FindMethodError, Il2CppClass};
 pub use exception::Il2CppException;
 pub use field_info::FieldInfo;
+pub use gc::{Gc, GcType};
 pub use method_info::{Il2CppReflectionMethod, MethodInfo, Result, Void};
 pub use object::{Il2CppObject, ObjectExt, ObjectType};
 pub use parameter_info::ParameterInfo;
@@ -126,5 +135,3 @@ pub use typecheck::caller::{Argument, Arguments, Returned, ThisArgument};
 pub use typecheck::generic::Generics;
 pub use typecheck::ty::Type;
 pub use valuetype::{ValueTypeExt, ValueTypePadding};
-pub use gc::{Gc, GcType};
-pub use byref::{ByRef, ByRefMut};

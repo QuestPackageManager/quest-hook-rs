@@ -22,12 +22,14 @@ impl Hook {
     /// # Safety
     /// `target` and `hook` must have the same signature and calling convention
     pub unsafe fn install(&self, target: *const (), hook: *const ()) -> bool {
-        match unsafe { RawDetour::new(target, hook) } {
-            Ok(detour) if detour.enable().is_ok() => {
-                self.detour.set(detour).ok();
-                true
+        unsafe {
+            match RawDetour::new(target, hook) {
+                Ok(detour) if detour.enable().is_ok() => {
+                    self.detour.set(detour).ok();
+                    true
+                }
+                _ => false,
             }
-            _ => false,
         }
     }
 

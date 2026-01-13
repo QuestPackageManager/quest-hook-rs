@@ -21,19 +21,16 @@ pub fn expand(range: Range<usize>) -> Result<TokenStream> {
             .map(|(n, gp)| quote!(<#gp>::matches(params.get_unchecked(#n).ty())));
 
         // log params
-        let log_parameters = generic_params_parameter
-            .clone()
-            .enumerate()
-            .map(|(n, gp)| quote!(
-                unsafe {
-                    #[cfg(feature = "trace")]
-                    crate::debug!("\tChecking parameter {} {:?} vs method param {:?}",
-                        #n,
-                        stringify!(#gp), 
-                        params.get(#n).map(|p| (p.ty(), <#gp>::matches(p.ty())))
-                    ); 
-                }
-            ));
+        let log_parameters = generic_params_parameter.clone().enumerate().map(|(n, gp)| {
+            quote!(unsafe {
+                #[cfg(feature = "trace")]
+                crate::debug!("\tChecking parameter {} {:?} vs method param {:?}",
+                    #n,
+                    stringify!(#gp),
+                    params.get(#n).map(|p| (p.ty(), <#gp>::matches(p.ty())))
+                );
+            })
+        });
 
         let generic_params_argument_tuple = generic_params_argument.clone();
         let generic_params_argument_where = generic_params_argument.clone();

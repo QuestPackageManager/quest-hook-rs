@@ -1,5 +1,3 @@
-#![feature(generic_associated_types, once_cell)]
-
 use libil2cpp::{Il2CppArray, Type};
 use quest_hook::hook;
 use quest_hook::libil2cpp::{unsafe_impl_reference_type, unsafe_impl_value_type, Il2CppObject};

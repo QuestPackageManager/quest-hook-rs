@@ -32,7 +32,7 @@ fn main() {
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings!");
 
-    let target = std::env::var("TARGET").unwrap();
+    // let target = std::env::var("TARGET").unwrap();
     // if target == "aarch64-linux-android" {
     //     cc::Build::new()
     //         .file("beatsaber-hook/shared/inline-hook/And64InlineHook.cpp")

@@ -67,7 +67,10 @@ impl Parse for Input {
         if rust_generics.len() != cs_generics.len() {
             return Err(Error::new(
                 Span::call_site(),
-                format!("mismatched Rust {:?} and C# generics {:?}", rust_generics, cs_generics),
+                format!(
+                    "mismatched Rust {:?} and C# generics {:?}",
+                    rust_generics, cs_generics
+                ),
             ));
         }
 

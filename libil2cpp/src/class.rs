@@ -5,7 +5,7 @@ use std::mem::transmute;
 use std::{fmt, ptr, slice, vec};
 
 use crate::{
-    raw, Arguments, FieldInfo, Generics, Il2CppException, Il2CppType, MethodInfo, Parameters,
+    raw, Arguments, FieldInfo, Gc, Generics, Il2CppException, Il2CppType, MethodInfo, Parameters,
     Return, Returned, ThisParameter, Type, WrapRaw,
 };
 
@@ -392,7 +392,7 @@ impl Il2CppClass {
 
     /// Instanciates a generic class template with the provided generic
     /// arguments
-    pub fn make_generic<G>(&self) -> Result<Option<&'static Self>, &mut Il2CppException>
+    pub fn make_generic<G>(&self) -> Result<Option<&'static Self>, Gc<Il2CppException>>
     where
         G: Generics,
     {
@@ -425,14 +425,14 @@ impl Il2CppClass {
         A: Arguments<N>,
         R: Returned,
     {
-        let method = self.find_static_method::<A, R, N>(name).unwrap_or_else(|e| {
-            panic!(
-                "no matching methods found for non-void {}.{}({}) Cause: {e:?}",
-                self,
-                name,
-                N
-            )
-        });
+        let method = self
+            .find_static_method::<A, R, N>(name)
+            .unwrap_or_else(|e| {
+                panic!(
+                    "no matching methods found for non-void {}.{}({}) Cause: {e:?}",
+                    self, name, N
+                )
+            });
         unsafe { method.invoke_unchecked((), args) }
     }
 
@@ -442,14 +442,14 @@ impl Il2CppClass {
     where
         A: Arguments<N>,
     {
-        let method = self.find_static_method::<A, (), N>(name).unwrap_or_else(|e| {
-            panic!(
-                "no matching methods found for void {}.{}({}) Cause: {e:?}",
-                self,
-                name,
-                N
-            )
-        });
+        let method = self
+            .find_static_method::<A, (), N>(name)
+            .unwrap_or_else(|e| {
+                panic!(
+                    "no matching methods found for void {}.{}({}) Cause: {e:?}",
+                    self, name, N
+                )
+            });
         unsafe { method.invoke_unchecked((), args) }
     }
 
