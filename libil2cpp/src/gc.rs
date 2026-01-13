@@ -5,7 +5,7 @@ use std::ops::{Deref, DerefMut, Not};
 use crate::{Argument, ObjectType, Returned, ThisArgument, Type};
 
 /// Wrapper type which implies the type is GC managed lifetime
-#[repr(transparent)]
+#[repr(C)]
 pub struct Gc<T>(*mut T)
 where
     *mut T: GcType, // assert that *mut T is a GcType
