@@ -8,8 +8,9 @@
     "id": "flamingo-rs",
     "version": "0.1.0",
     "url": null,
-    "additionalData": {},
-    "cmake": false
+    "additionalData": {
+      "cmake": false
+    }
   },
   "workspace": {
     "scripts": {},

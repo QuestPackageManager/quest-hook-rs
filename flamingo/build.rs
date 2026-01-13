@@ -10,6 +10,16 @@ fn main() {
     // shared library.
     println!("cargo:rustc-link-lib=flamingo");
 
+    println!("cargo:rerun-if-changed=wrapper.h");
+    println!("cargo:rerun-if-changed=extern/includes");
+
+    // run qpm restore to ensure flamingo is available
+    use std::process::Command;
+    Command::new("qpm")
+        .args(["restore"])
+        .status()
+        .expect("Failed to run qpm restore");
+
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.
