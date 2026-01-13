@@ -1,5 +1,5 @@
 [workspace]
-members = ["proc_macros", "inline_hook", "libil2cpp"]
+members = ["proc_macros", "inline_hook", "libil2cpp", "flamingo"]
 
 [package]
 name = "quest_hook"
