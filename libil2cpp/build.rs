@@ -20,6 +20,8 @@ fn run_bindgen() {
     compile_error!("No il2cpp version feature enabled: enable one of 'il2cpp_v29' or 'il2cpp_v31'");
 
     let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    println!("Manifest dir: {}", manifest.display());
+    
     println!(
         "cargo:rustc-link-search={}/extern/includes/libil2cpp/il2cpp/libil2cpp",
         manifest.display()
