@@ -21,18 +21,25 @@ fn run_bindgen() {
 
     let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     println!("Manifest dir: {}", manifest.display());
-    
+
     println!(
         "cargo:rustc-link-search={}/extern/includes/libil2cpp/il2cpp/libil2cpp",
         manifest.display()
     );
 
     // qpm dependency add libil2cpp --version {version}
-    // qpm restore
     Command::new("qpm")
         .args(["dependency", "add", "libil2cpp", "--version", version])
+        .current_dir(&manifest)
         .status()
         .expect("Failed to add qpm dependency");
+
+    // qpm restore
+    Command::new("qpm")
+        .args(["restore"])
+        .current_dir(&manifest)
+        .status()
+        .expect("Failed to restore qpm dependencies");
 
     println!("cargo:rerun-if-changed=wrapper.h");
     let bindings = bindgen::Builder::default()
