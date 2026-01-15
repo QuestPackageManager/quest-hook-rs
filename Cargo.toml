@@ -44,8 +44,8 @@ cache = ["libil2cpp/cache"]
 serde = ["libil2cpp/serde"]
 trace = ["libil2cpp/trace"]
 bindgen = ["libil2cpp/bindgen"]
-inline_hook = ["inline_hook"]
-flamingo = ["flamingo"]
+inline_hook = ["dep:inline_hook"]
+flamingo = ["dep:flamingo"]
 
 [[example]]
 name = "hello_world"
