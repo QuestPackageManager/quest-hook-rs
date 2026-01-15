@@ -19,7 +19,10 @@ mod types;
 pub use functions::*;
 pub use types::*;
 
-use std::mem::{size_of, transmute};
+use std::{
+    ffi::c_void,
+    mem::{size_of, transmute},
+};
 
 use crate::Type;
 
@@ -94,6 +97,9 @@ pub unsafe trait WrapRaw: Sized {
 ///
 /// # Safety
 /// The object must be of the valid type and cointain a valid value.
+///
+/// `Object::Unbox` (the underlying il2cpp function) does not allocate memory,
+/// so the returned value is a copy of the value stored in the object.
 #[inline]
 pub unsafe fn unbox<T>(object: &Il2CppObject) -> T {
     let address = object as *const Il2CppObject as usize;
@@ -104,8 +110,17 @@ pub unsafe fn unbox<T>(object: &Il2CppObject) -> T {
 /// Boxes a value type into an [`Il2CppObject`]
 /// # Safety
 /// The provided value must be a valid value of the given type.
+///
+/// `Object::Box` (the underlying il2cpp function) allocates memory for the
+/// boxed object, so the returned pointer is managed by the il2cpp GC
 #[inline]
 pub unsafe fn value_box<T: Type>(this: &mut T) -> *mut T {
-    todo!("boxing value types is not yet implemented");
-    this as *mut T
+    // TODO: WrapRaw for T?
+    let boxed = types::il2cpp_value_box(
+        T::class().raw() as *const Il2CppClass as *mut Il2CppClass,
+        (this as *mut T).cast::<c_void>(),
+    )
+    .cast::<T>();
+
+    boxed
 }
