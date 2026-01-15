@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fs, path::PathBuf};
+use std::{collections::HashSet, fs, path::Path};
 
 /// Setup default linker flags for cdylib building
 pub fn setup_linker_defaults() {
@@ -20,7 +20,7 @@ pub fn setup_linker_defaults() {
 
 /// Linker flags for dynamic libs in lib_path e.g qpm extern libs
 /// This is needed to link dynamic libs when building cdylib
-pub fn linker_flags(lib_path: PathBuf) {
+pub fn linker_flags(lib_path: &Path) {
     println!("cargo:rustc-link-search={}", lib_path.display());
 
     let mut to_link_libs = HashSet::new();
