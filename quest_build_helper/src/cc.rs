@@ -10,7 +10,9 @@ pub trait QuestCpp: Sized {
 }
 
 impl QuestCpp for cc::Build {
-    /// Add il2cpp includes
+    /// Add il2cpp includes e.g extern/includes
+    /// # Arguments
+    /// * `include_dir` - extern/includes path
     fn add_il2cpp_includes(&mut self, include_dir: &Path) -> &mut Self {
         self.include(
             include_dir
@@ -39,11 +41,15 @@ impl QuestCpp for cc::Build {
     }
 
     /// Add fmt includes
+    /// # Arguments
+    /// * `include_dir` - extern/includes path
     fn add_fmt_includes(&mut self, include_dir: &Path) -> &mut Self {
         self.include(include_dir.join("fmt").join("fmt").join("include"))
     }
 
     /// Add bs-cordl includes
+    /// # Arguments
+    /// * `include_dir` - extern/includes path
     fn add_cordl_includes(&mut self, include_dir: &Path) -> &mut Self {
         self.include(include_dir.join("bs-cordl").join("include"))
     }
