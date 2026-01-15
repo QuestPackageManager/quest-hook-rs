@@ -9,7 +9,8 @@ pub fn setup_linker_defaults() {
     println!("cargo:rustc-link-arg=-Wl,-z,defs");
 
     // TODO: How to avoid this?
-    if cfg!(target_os = "android") {
+    let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    if target_os == "android" {
         println!("cargo:rustc-link-lib=static=c++");
 
         // println!("cargo:rustc-link-lib=static=c++abi");
