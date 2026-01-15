@@ -14,7 +14,8 @@ edition = "2021"
 
 [dependencies]
 quest_hook_proc_macros = { path = "./proc_macros" }
-inline_hook = { path = "./inline_hook" }
+inline_hook = { path = "./inline_hook", optional = true}
+flamingo = { path = "./flamingo", optional = true}
 libil2cpp = { path = "./libil2cpp", default-features = false }
 cfg-if = "1"
 tracing = { version = "0.1", features = [
@@ -33,7 +34,7 @@ tracing-subscriber = { version = "0.3", features = [
 ], default-features = false, optional = true }
 
 [features]
-default = ["util", "cache", "il2cpp_v31", "bindgen"]
+default = ["util", "cache", "il2cpp_v31", "bindgen", "inline_hook"]
 il2cpp_v31 = ["libil2cpp/il2cpp_v31"]
 il2cpp_v29 = ["libil2cpp/il2cpp_v29"]
 il2cpp_v24 = ["libil2cpp/il2cpp_v24"]
@@ -43,6 +44,8 @@ cache = ["libil2cpp/cache"]
 serde = ["libil2cpp/serde"]
 trace = ["libil2cpp/trace"]
 bindgen = ["libil2cpp/bindgen"]
+inline_hook = ["inline_hook"]
+flamingo = ["flamingo"]
 
 [[example]]
 name = "hello_world"
