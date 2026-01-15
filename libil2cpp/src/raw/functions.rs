@@ -36,4 +36,7 @@ il2cpp_functions! {
     pub fn raise_exception(exc: &Il2CppException) -> !;
     pub fn resolve_icall(name: *const c_char) -> Il2CppMethodPointer;
     pub fn object_new(class: &Il2CppClass) -> &'static mut Il2CppObject;
+
+    pub fn value_box(klass: *mut Il2CppClass, data: *mut c_void) -> *mut Il2CppObject;
+    pub fn object_unbox(obj: *mut Il2CppObject) -> *mut c_void;
 }

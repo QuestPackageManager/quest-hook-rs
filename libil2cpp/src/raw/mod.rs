@@ -116,7 +116,7 @@ pub unsafe fn unbox<T>(object: &Il2CppObject) -> T {
 #[inline]
 pub unsafe fn value_box<T: Type>(this: &mut T) -> *mut T {
     // TODO: WrapRaw for T?
-    let boxed = types::il2cpp_value_box(
+    let boxed = functions::value_box(
         T::class().raw() as *const Il2CppClass as *mut Il2CppClass,
         (this as *mut T).cast::<c_void>(),
     )
