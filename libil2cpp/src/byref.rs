@@ -16,6 +16,8 @@ pub type ByRefMut<T> = ByRef<T>;
 /// Trait alias for types that can be used with the `ByRef` wrapper.
 pub trait ReffableType = Type + Returned + Argument;
 
+
+
 impl<'a, T> ByRef<T>
 where
     T: ReffableType,
@@ -79,6 +81,11 @@ where
         T::class().this_arg_ty() == ty
             || ty.is_ref() && <T as crate::Type>::class().is_assignable_from(ty.class())
     }
+}
+
+impl<T> Copy for ByRef<T> where T: ReffableType {}
+impl<T> Clone for ByRef<T> where T: ReffableType {
+    fn clone(&self) -> Self { *self }
 }
 
 // // Should I do this or force to implement these on a wrapper?
