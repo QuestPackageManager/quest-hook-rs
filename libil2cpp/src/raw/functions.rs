@@ -12,7 +12,20 @@ use super::{
     Il2CppString, Il2CppType, MethodInfo,
 };
 
-il2cpp_functions! {
+#[cfg(target_os = "android")]
+pub const IL2CPP_BINARY: &str = "libil2cpp.so";
+
+#[cfg(target_os = "linux")]
+pub const IL2CPP_BINARY: &str = "libil2cpp.so";
+
+#[cfg(target_os = "windows")]
+pub const IL2CPP_BINARY: &str = "il2cpp.dll";
+
+#[cfg(target_os = "macos")]
+pub const IL2CPP_BINARY: &str = "libil2cpp.dylib";
+
+// functions get prefixed with "il2cpp_"
+il2cpp_functions! { IL2CPP_BINARY =>
     pub fn domain_get() -> &'static Il2CppDomain;
     pub fn domain_get_assemblies(domain: &Il2CppDomain, size: &mut usize) -> &'static [&'static Il2CppAssembly];
     pub fn assembly_get_image(assembly: &Il2CppAssembly) -> Option<&'static Il2CppImage>;
