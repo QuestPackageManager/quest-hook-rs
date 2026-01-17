@@ -7,7 +7,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        unity: [unity2019, unity2018]
+        unity: [il2cpp_v31, il2cpp_v29, il2cpp_v24, unity2018]
         os: [windows-latest, ubuntu-latest]
 
     steps:
