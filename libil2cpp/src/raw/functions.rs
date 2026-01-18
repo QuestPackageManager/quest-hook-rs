@@ -12,6 +12,8 @@ use super::{
     Il2CppString, Il2CppType, MethodInfo,
 };
 
+// https://katyscode.wordpress.com/2020/12/27/il2cpp-part-2/
+
 #[cfg(target_os = "android")]
 pub const IL2CPP_BINARY: &str = "libil2cpp.so";
 
@@ -19,10 +21,10 @@ pub const IL2CPP_BINARY: &str = "libil2cpp.so";
 pub const IL2CPP_BINARY: &str = "libil2cpp.so";
 
 #[cfg(target_os = "windows")]
-pub const IL2CPP_BINARY: &str = "il2cpp.dll";
+pub const IL2CPP_BINARY: &str = "GameAssembly.dll";
 
 #[cfg(target_os = "macos")]
-pub const IL2CPP_BINARY: &str = "libil2cpp.dylib";
+pub const IL2CPP_BINARY: &str = "GameAssembly.dylib";
 
 // functions get prefixed with "il2cpp_"
 il2cpp_functions! { IL2CPP_BINARY =>
