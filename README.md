@@ -8,6 +8,17 @@ A library for writing (mostly) memory safe mods for Unity il2cpp games
 
 Despite its name and initial target and scope, this library supports modding most il2cpp games, as long as you have a way to load the mods.
 
+### il2cpp versions
+
+| Feature flag   | il2cpp version |
+|----------------|----------------|
+| `il2cpp_v31`   | Unity 2021+    |
+| `il2cpp_v29`   | Unity 2019–2020 |
+| `il2cpp_v24`   | Unity 2018     |
+| `unity2018`    | Unity 2018 (legacy alias) |
+
+Exactly one version feature must be enabled. The default is `il2cpp_v31`.
+
 ### Unity versions
 
 - Unity 2019
@@ -15,26 +26,42 @@ Despite its name and initial target and scope, this library supports modding mos
 
 ### Targets
 
-- Android `ARMv8`
-- Android `ARMv7`
-- Windows x64
-- Windows x86
-- Linux x64
-- Linux x86
+| Platform | Architecture |
+|----------|-------------|
+| Android  | AArch64 (ARMv8) |
+| Android  | ARMv7 |
+| Windows  | x86\_64 / x86 |
+| Linux    | x86\_64 / x86 |
+| macOS    | x86\_64 |
 
-## Usage
+## Quick start
 
-Simply add the library as a dependency to your `Cargo.toml` and set the crate type to a C dynamic library. You will need to use a nightly version in order to compile `quest_hook`. **Don't forget to select a Unity version**.
+Add `quest_hook` as a dependency and set your crate type to a C dynamic library. A **nightly** Rust toolchain is required.
 
 ```toml
+# Cargo.toml
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-quest_hook = { git = "https://github.com/StackDoubleFlow/quest-hook-rs.git", features = ["unity2019"] }
+quest_hook = { git = "https://github.com/StackDoubleFlow/quest-hook-rs.git" }
 ```
 
-This library is still under heavy development and breaking changes are frequent. To avoid dealing with those, you can [pin the dependency to a specific commit or tag](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#specifying-dependencies-from-git-repositories).
+The default feature set (`il2cpp_v31 + util + cache + inline_hook`) is a sensible starting point.
+To target an older game, disable the default il2cpp version and enable the correct one:
+
+```toml
+[dependencies]
+quest_hook = { git = "https://github.com/StackDoubleFlow/quest-hook-rs.git", default-features = false, features = ["il2cpp_v29", "util", "cache", "inline_hook"] }
+```
+
+A nightly toolchain can be pinned project-wide with a `rust-toolchain.toml`:
+
+```toml
+# rust-toolchain.toml
+[toolchain]
+channel = "nightly"
+```
 
 ## Example
 
@@ -62,31 +89,41 @@ pub extern "C" fn load() {
 }
 ```
 
-Check out the [`examples`](./examples/) directory for more examples.
+See the [`examples/`](./examples/) directory for more complete examples including custom il2cpp types.
 
 ## Cargo features
 
-- `unity2019`, `unity2018` - Unity version the targetted game uses
-- `util` - Adds small utility functions for setting up logging and the like
-- `cache` - Enables class and method caching to greatly improve lookup speed at the cost of slightly higher memory consumption
-- `serde` - Implement `Serialize` and `Deserialize` for il2cpp types where it makes sense
-- `trace` - Adds `tracing` instrumentation to many internal functions
+| Feature | Default | Description |
+|---------|---------|-------------|
+| `il2cpp_v31` | ✓ | Target il2cpp from Unity 2021+ |
+| `il2cpp_v29` | | Target il2cpp from Unity 2019–2020 |
+| `il2cpp_v24` | | Target il2cpp from Unity 2018 |
+| `unity2018` | | Unity 2018 legacy alias for `il2cpp_v24` |
+| `util` | ✓ | `setup()` helper — logging + panic handler via `tracing` |
+| `cache` | ✓ | Cache class/method lookups for faster repeated access |
+| `inline_hook` | ✓ | Function hooking via `inline_hook` / `flamingo` |
+| `flamingo` | | Use the Flamingo native hooking library on Android |
+| `bindgen` | ✓ | Generate il2cpp bindings at build time via `bindgen` |
+| `serde` | | `Serialize`/`Deserialize` for il2cpp types |
+| `trace` | | `tracing` instrumentation inside the library internals |
+
+## Workspace crates
+
+| Crate | Description |
+|-------|-------------|
+| [`libil2cpp`](./libil2cpp/) | Safe wrappers and raw bindings for Unity's libil2cpp |
+| [`inline_hook`](./inline_hook/) | Cross-platform inline function hooking |
+| [`flamingo`](./flamingo/) | Rust bindings for the Flamingo Android hooking library |
+| [`proc_macros`](./proc_macros/) | The `#[hook]` macro and other derive helpers |
+| [`quest_build_helper`](./quest_build_helper/) | Build-script utilities for Quest mod projects |
 
 ## Contributing
 
 Contributions are welcome, especially to the documentation and examples. Most of the discussions regarding the development of this library happen in the `#quest-mod-dev` channel of the [BSMG Discord server](https://discord.gg/beatsabermods).
 
-Everything that can be reasonably be done in Rust should be done in Rust. The reasons behind this choice are improving readability and providing a more Rust-friendly API, and not safety. This library is, by nature, extremely unsafe, and contains a lot of unsafe code.
+Everything that can reasonably be done in Rust should be done in Rust. This library is, by nature, extremely unsafe and contains a lot of unsafe code — the goal is a Rust-friendly API surface, not the elimination of unsafety.
 
-A decent understanding of both Rust and C++ is required for most work on the library. The main reference used for development is libil2cpp, which is written in C++. Another excellent resource is [beatsaber-hook](https://github.com/sc2ad/beatsaber-hook), also written in C++.
-
-This library is mainly developed using Visual Studio Code with [rust-analyzer](https://rust-analyzer.github.io/). Code style, quality and documentation are enforced using rustfmt and clippy via GitHub Actions. Due to the nature of this library, we can sadly not really unit test most of the features, but are open to suggestions to improve this aspect.
-
-### Project structure
-
-- `libil2cpp` - Abstractions and raw bindings for libil2cpp. This is where most of the code and functionality lives.
-- `inline_hook` - Cross-platform function hooking abstraction. This is where support for more targets can be added.
-- `proc_macros` - Home of the `hook` macro implementation, and of various internally used ones.
+A decent understanding of both Rust and C++ is required for most contributions. The main reference is the libil2cpp source. Another useful reference is [beatsaber-hook](https://github.com/sc2ad/beatsaber-hook).
 
 ## License
 
@@ -94,4 +131,4 @@ This library is mainly developed using Visual Studio Code with [rust-analyzer](h
 
 ## Credits
 
-This library wouldn't exist without the invaluable help, feedback and previous work from [Sc2ad](https://github.com/sc2ad).
+This library wouldn't exist without the invaluable help, feedback, and previous work from [Sc2ad](https://github.com/sc2ad).
