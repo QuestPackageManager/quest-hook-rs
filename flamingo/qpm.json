@@ -21,7 +21,7 @@
   "dependencies": [
     {
       "id": "flamingo",
-      "versionRange": "^1.2.0",
+      "versionRange": "^1.2.1",
       "additionalData": {}
     }
   ]
