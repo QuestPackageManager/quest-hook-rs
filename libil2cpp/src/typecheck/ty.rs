@@ -1,6 +1,6 @@
 use crate::{
-    Il2CppClass, Il2CppObject, Il2CppReflectionMethod, Il2CppReflectionType, Il2CppString,
-    Il2CppType, MethodInfo,
+    Il2CppClass, Il2CppException, Il2CppObject, Il2CppReflectionMethod, Il2CppReflectionType,
+    Il2CppString, Il2CppType, MethodInfo,
 };
 
 /// Trait implemented by Rust types that are also C# types
@@ -21,7 +21,13 @@ pub unsafe trait Type: 'static {
 
     /// [`Il2CppClass`] of the type
     fn class() -> &'static Il2CppClass {
-        Il2CppClass::find(Self::NAMESPACE, Self::CLASS_NAME).unwrap()
+        Il2CppClass::find(Self::NAMESPACE, Self::CLASS_NAME)
+            .unwrap_or_else(|| panic!("Class {}.{} not found", Self::NAMESPACE, Self::CLASS_NAME))
+    }
+
+    /// Returns the [`Il2CppType`] of this type
+    fn type_() -> &'static Il2CppType {
+        Self::class().ty()
     }
 
     /// Whether the type can be used as a `this` argument for the given
@@ -63,6 +69,54 @@ pub unsafe trait Type: 'static {
     }
 }
 
+// implement type for pointers
+unsafe impl<T: Type> Type for *mut T {
+    type Held<'a> = Option<&'a mut T>;
+    type HeldRaw = *mut T;
+
+    const NAMESPACE: &'static str = T::NAMESPACE;
+    const CLASS_NAME: &'static str = T::CLASS_NAME;
+
+    fn matches_reference_argument(ty: &Il2CppType) -> bool {
+        T::matches_reference_argument(ty)
+    }
+
+    fn matches_value_argument(ty: &Il2CppType) -> bool {
+        T::matches_value_argument(ty)
+    }
+
+    fn matches_reference_parameter(ty: &Il2CppType) -> bool {
+        T::matches_reference_parameter(ty)
+    }
+
+    fn matches_value_parameter(ty: &Il2CppType) -> bool {
+        T::matches_value_argument(ty)
+    }
+}
+unsafe impl<T: Type> Type for *const T {
+    type Held<'a> = Option<&'a mut T>;
+    type HeldRaw = *mut T;
+
+    const NAMESPACE: &'static str = T::NAMESPACE;
+    const CLASS_NAME: &'static str = T::CLASS_NAME;
+
+    fn matches_reference_argument(ty: &Il2CppType) -> bool {
+        T::matches_reference_argument(ty)
+    }
+
+    fn matches_value_argument(ty: &Il2CppType) -> bool {
+        T::matches_value_argument(ty)
+    }
+
+    fn matches_reference_parameter(ty: &Il2CppType) -> bool {
+        T::matches_reference_parameter(ty)
+    }
+
+    fn matches_value_parameter(ty: &Il2CppType) -> bool {
+        T::matches_value_argument(ty)
+    }
+}
+
 crate::unsafe_impl_value_type!(in crate for u8 => System.Byte);
 crate::unsafe_impl_value_type!(in crate for i8 => System.SByte);
 crate::unsafe_impl_value_type!(in crate for u16 => System.UInt16);
@@ -76,7 +130,9 @@ crate::unsafe_impl_value_type!(in crate for isize => System.IntPtr);
 crate::unsafe_impl_value_type!(in crate for f32 => System.Single);
 crate::unsafe_impl_value_type!(in crate for f64 => System.Double);
 crate::unsafe_impl_value_type!(in crate for bool => System.Boolean);
+crate::unsafe_impl_value_type!(in crate for char => System.Char);
 
+crate::unsafe_impl_reference_type!(in crate for Il2CppException => System.Exception);
 crate::unsafe_impl_reference_type!(in crate for Il2CppObject => System.Object);
 crate::unsafe_impl_reference_type!(in crate for Il2CppString => System.String);
 crate::unsafe_impl_reference_type!(in crate for Il2CppReflectionType => System.RuntimeType);

@@ -1,7 +1,7 @@
 use std::fmt;
 use std::ops::DerefMut;
 
-use crate::{raw, Argument, Arguments, Il2CppClass, Il2CppException, Returned, Type, WrapRaw};
+use crate::{raw, Argument, Arguments, Gc, Il2CppClass, Returned, Type, WrapRaw};
 
 /// An il2cpp object
 #[repr(transparent)]
@@ -19,11 +19,7 @@ impl Il2CppObject {
     /// # Panics
     ///
     /// This method will panic if a matching method can't be found.
-    pub fn invoke<A, R, const N: usize>(
-        &mut self,
-        name: &str,
-        args: A,
-    ) -> Result<R, &mut Il2CppException>
+    pub fn invoke<A, R, const N: usize>(&mut self, name: &str, args: A) -> crate::Result<R>
     where
         A: Arguments<N>,
         R: Returned,
@@ -38,11 +34,7 @@ impl Il2CppObject {
     /// # Panics
     ///
     /// This method will panic if a matching method can't be found.
-    pub fn invoke_void<A, const N: usize>(
-        &mut self,
-        name: &str,
-        args: A,
-    ) -> Result<(), &mut Il2CppException>
+    pub fn invoke_void<A, const N: usize>(&mut self, name: &str, args: A) -> crate::Result<()>
     where
         A: Arguments<N>,
     {
@@ -97,13 +89,13 @@ pub trait ObjectExt:
     for<'a> Type<Held<'a> = Option<&'a mut Self>> + DerefMut<Target = Il2CppObject> + Sized
 {
     /// Creates a new object using the constructor taking the given arguments
-    fn new<A, const N: usize>(args: A) -> &'static mut Self
+    fn new<A, const N: usize>(args: A) -> Gc<Self>
     where
         A: Arguments<N>,
     {
         let object: &mut Self = Self::class().instantiate();
         object.invoke_void(".ctor", args).unwrap();
-        object
+        object.into()
     }
 }
 #[rustfmt::skip]
@@ -112,4 +104,51 @@ where
     for<'a> T: Type<Held<'a> = Option<&'a mut Self>>,
     T: DerefMut<Target = Il2CppObject>,
 {
+}
+
+/// Trait for types that can be treated as ``Il2CppObject``
+/// Useful for generic constraints and supporting multiple object-like types
+pub trait ObjectType {
+    /// Returns a reference to the underlying ``Il2CppObject``
+    fn as_object(&self) -> &Il2CppObject;
+    /// Returns a mutable reference to the underlying ``Il2CppObject``
+    fn as_object_mut(&mut self) -> &mut Il2CppObject;
+}
+
+impl ObjectType for Il2CppObject {
+    fn as_object(&self) -> &Il2CppObject {
+        self
+    }
+
+    fn as_object_mut(&mut self) -> &mut Il2CppObject {
+        self
+    }
+}
+
+// implement object type for anything that can be dereferenced to Il2CppObject
+impl<T> ObjectType for *mut T
+where
+    T: ObjectType,
+{
+    fn as_object(&self) -> &Il2CppObject {
+        unsafe { self.as_ref().unwrap().as_object() }
+    }
+
+    fn as_object_mut(&mut self) -> &mut Il2CppObject {
+        unsafe { self.as_mut().unwrap().as_object_mut() }
+    }
+}
+
+impl<T> ObjectType for Gc<T>
+where
+    T: ObjectType,
+    T: for<'a> Type<Held<'a> = std::option::Option<&'a mut T>>,
+{
+    fn as_object(&self) -> &Il2CppObject {
+        self.as_ref().as_object()
+    }
+
+    fn as_object_mut(&mut self) -> &mut Il2CppObject {
+        self.as_mut().as_object_mut()
+    }
 }

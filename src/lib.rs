@@ -1,4 +1,4 @@
-#![feature(backtrace, doc_cfg)]
+#![feature(doc_cfg)]
 #![doc(html_root_url = "https://stackdoubleflow.github.io/quest-hook-rs/quest_hook")]
 #![doc = include_str!("../README.md")]
 #![warn(
@@ -9,7 +9,6 @@
     clippy::dbg_macro,
     clippy::debug_assert_with_mut_call,
     clippy::doc_markdown,
-    clippy::empty_enum,
     clippy::enum_glob_use,
     clippy::exit,
     clippy::expl_impl_clone_on_copy,
@@ -29,15 +28,14 @@
     clippy::linkedlist,
     clippy::lossy_float_literal,
     clippy::macro_use_imports,
+    clippy::missing_transmute_annotations,
     clippy::manual_ok_or,
     clippy::map_err_ignore,
     clippy::map_flatten,
     clippy::map_unwrap_or,
-    clippy::match_on_vec_items,
     clippy::match_same_arms,
     clippy::match_wildcard_for_single_variants,
     clippy::mem_forget,
-    clippy::mismatched_target_os,
     clippy::mut_mut,
     clippy::mutex_integer,
     clippy::needless_borrow,
@@ -53,7 +51,6 @@
     clippy::string_add_assign,
     clippy::string_add,
     clippy::string_lit_as_bytes,
-    clippy::string_to_string,
     clippy::todo,
     clippy::trait_duplication_in_bounds,
     clippy::unimplemented,
@@ -89,4 +86,9 @@ pub use libil2cpp;
 pub use quest_hook_proc_macros::hook;
 
 #[doc(hidden)]
+#[cfg(feature = "inline_hook")]
 pub use inline_hook;
+
+#[doc(hidden)]
+#[cfg(feature = "flamingo")]
+pub use flamingo;

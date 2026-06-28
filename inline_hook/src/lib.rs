@@ -1,4 +1,3 @@
-#![cfg_attr(not(target_os = "android"), feature(once_cell))]
 #![doc(html_root_url = "https://stackdoubleflow.github.io/quest-hook-rs/inline_hook")]
 #![warn(
     clippy::all,
@@ -8,7 +7,7 @@
     clippy::dbg_macro,
     clippy::debug_assert_with_mut_call,
     clippy::doc_markdown,
-    clippy::empty_enum,
+    clippy::empty_enums,
     clippy::enum_glob_use,
     clippy::exit,
     clippy::expl_impl_clone_on_copy,
@@ -32,11 +31,10 @@
     clippy::map_err_ignore,
     clippy::map_flatten,
     clippy::map_unwrap_or,
-    clippy::match_on_vec_items,
     clippy::match_same_arms,
     clippy::match_wildcard_for_single_variants,
     clippy::mem_forget,
-    clippy::mismatched_target_os,
+    unexpected_cfgs,
     clippy::mut_mut,
     clippy::mutex_integer,
     clippy::needless_borrow,
@@ -52,7 +50,6 @@
     clippy::string_add_assign,
     clippy::string_add,
     clippy::string_lit_as_bytes,
-    clippy::string_to_string,
     clippy::todo,
     clippy::trait_duplication_in_bounds,
     clippy::unimplemented,

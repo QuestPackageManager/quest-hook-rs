@@ -10,5 +10,5 @@ use crate::{
     Type, WrapRaw,
 };
 
-quest_hook_proc_macros::impl_arguments_parameters!(1..=16);
-quest_hook_proc_macros::impl_generics!(1..=16);
+quest_hook_proc_macros::impl_arguments_parameters!(1..=32);
+quest_hook_proc_macros::impl_generics!(1..=32);

@@ -1,14 +1,17 @@
 use std::borrow::Cow;
 use std::ffi::{CStr, CString};
+use std::fmt::Display;
 use std::mem::transmute;
-use std::{fmt, ptr, slice};
+use std::{fmt, ptr, slice, vec};
 
 use crate::{
-    raw, Arguments, FieldInfo, Generics, Il2CppException, Il2CppType, MethodInfo, Parameters,
+    raw, Arguments, FieldInfo, Gc, Generics, Il2CppException, Il2CppType, MethodInfo, Parameters,
     Return, Returned, ThisParameter, Type, WrapRaw,
 };
 
-#[cfg(feature = "unity2019")]
+#[cfg(feature = "il2cpp_v31")]
+type FieldInfoSlice<'a> = &'a [FieldInfo];
+#[cfg(feature = "il2cpp_v24")]
 type FieldInfoSlice<'a> = &'a [FieldInfo];
 #[cfg(feature = "unity2018")]
 type FieldInfoSlice<'a> = &'a [&'static FieldInfo];
@@ -46,6 +49,9 @@ impl Il2CppClass {
         let mut assemblies_count = 0;
         let assemblies = unsafe { raw::domain_get_assemblies(domain, &mut assemblies_count) };
 
+        debug!("assemblies_count: {}", assemblies_count);
+        debug!("Looking for class: {}.{}", namespace, name);
+
         for assembly in assemblies.iter().take(assemblies_count) {
             // For some reason, an assembly might not have an image
             let image = match unsafe { raw::assembly_get_image(assembly) } {
@@ -54,13 +60,18 @@ impl Il2CppClass {
             };
 
             let class =
-                unsafe { raw::class_from_name(image, c_namespace.as_ptr(), c_name.as_ptr()) };
+                unsafe { raw::class_from_name(image, c_namespace.as_ptr(), c_name.as_ptr()) }
+                    .map(|class| unsafe { Self::wrap(class) });
+
+            debug!("class: {class:?} in assembly image {image:?}",);
+
             if let Some(class) = class {
                 // Ensure class is initialized
                 // TODO: Call Class::Init somehow
-                let _ = unsafe { raw::class_get_method_from_name(class, b"\0".as_ptr().cast(), 0) };
+                let _ =
+                    unsafe { raw::class_get_method_from_name(&class.0, c"".as_ptr().cast(), 0) };
 
-                let class = unsafe { Self::wrap(class) };
+                debug!("class found: {class}", class = class);
 
                 #[cfg(feature = "cache")]
                 cache::CLASS_CACHE.with(move |c| c.borrow_mut().insert(key.into(), class));
@@ -69,6 +80,7 @@ impl Il2CppClass {
             }
         }
 
+        debug!("Class not found {}.{}", namespace, name);
         None
     }
 
@@ -119,22 +131,45 @@ impl Il2CppClass {
                 .filter(|mi| mi.name() == name && A::matches(mi) && R::matches(mi.return_ty()))
                 .copied();
 
-            match match matching.next() {
-                // If we have no matches, we continue to the parent
-                None => continue,
-                Some(mi) => (mi, matching.next()),
-            } {
-                (mi, None) => {
+            match (matching.next(), matching.next()) {
+                // only one match
+                (Some(mi), None) => {
                     #[cfg(feature = "cache")]
                     cache::METHOD_CACHE.with(move |c| c.borrow_mut().insert(key.into(), mi));
 
                     return Ok(mi);
                 }
-                _ => return Err(FindMethodError::Many),
+
+                // multiple matches
+                (Some(mi), Some(mi2)) => {
+                    let found = vec![mi, mi2]
+                        .into_iter()
+                        .chain(matching)
+                        .map(|mi| {
+                            let info = FindMethodParameters {
+                                ty_name: c.to_string(),
+                                method_name: name.to_string(),
+                                parameters: mi.parameters().iter().map(|t| t.to_string()).collect(),
+                            };
+                            info
+                        })
+                        .collect();
+
+                    return Err(FindMethodError::Many(found));
+                }
+
+                // If we have no matches, we continue to the parent
+                _ => continue,
             }
         }
 
-        Err(FindMethodError::None)
+        let info = FindMethodParameters {
+            ty_name: self.to_string(),
+            method_name: name.to_string(),
+            // TODO!
+            parameters: vec![format!("UNABLE TO PROVIDE! Count! {N}")],
+        };
+        Err(FindMethodError::None(info))
     }
 
     /// Find a `static` method belonging to the class by name with type checking
@@ -171,6 +206,12 @@ impl Il2CppClass {
                 .methods()
                 .iter()
                 .filter(|mi| {
+                    debug!("Looking for method: {}.{}", self, name);
+                    debug!("mi.name() == name: {}", mi.name() == name);
+                    debug!("mi.is_static(): {}", mi.is_static());
+                    debug!("A::matches(mi): {}", A::matches(mi));
+                    debug!("R::matches(mi.return_ty()): {}", R::matches(mi.return_ty()));
+                    debug!("");
                     mi.name() == name
                         && mi.is_static()
                         && A::matches(mi)
@@ -178,22 +219,45 @@ impl Il2CppClass {
                 })
                 .copied();
 
-            match match matching.next() {
-                // If we have no matches, we continue to the parent
-                None => continue,
-                Some(mi) => (mi, matching.next()),
-            } {
-                (mi, None) => {
+            match (matching.next(), matching.next()) {
+                // only one match
+                (Some(mi), None) => {
                     #[cfg(feature = "cache")]
                     cache::METHOD_CACHE.with(move |c| c.borrow_mut().insert(key.into(), mi));
-
+                    debug!("Found method: {}.{}", self, name);
                     return Ok(mi);
                 }
-                _ => return Err(FindMethodError::Many),
+
+                // multiple matches
+                (Some(mi), Some(mi2)) => {
+                    let found = vec![mi, mi2]
+                        .into_iter()
+                        .chain(matching)
+                        .map(|mi| {
+                            let info = FindMethodParameters {
+                                ty_name: c.to_string(),
+                                method_name: name.to_string(),
+                                parameters: mi.parameters().iter().map(|t| t.to_string()).collect(),
+                            };
+                            info
+                        })
+                        .collect();
+
+                    return Err(FindMethodError::Many(found));
+                }
+
+                // If we have no matches, we continue to the parent
+                _ => continue,
             }
         }
 
-        Err(FindMethodError::None)
+        let info = FindMethodParameters {
+            ty_name: self.to_string(),
+            method_name: name.to_string(),
+            // TODO!
+            parameters: vec![format!("UNABLE TO PROVIDE! Count! {N}")],
+        };
+        Err(FindMethodError::None(info))
     }
 
     /// Find a method belonging to the class or its parents by name with type
@@ -208,18 +272,57 @@ impl Il2CppClass {
         P: Parameters,
         R: Return,
     {
+        debug!("Looking for method: {}", name);
+
         let mut matching = self
             .methods()
             .iter()
             .filter(|mi| {
+                debug!("Looking for method: {}", name);
+                debug!("mi.name() == name: {}", mi.name() == name);
+                debug!("T::matches(mi): {}", T::matches(mi));
+                debug!(
+                    "P::matches(mi): {} count {} method {}",
+                    P::matches(mi),
+                    P::COUNT,
+                    mi.parameters().len()
+                );
+                debug!("R::matches(mi.return_ty()): {}", R::matches(mi.return_ty()));
+                debug!("");
                 mi.name() == name && T::matches(mi) && P::matches(mi) && R::matches(mi.return_ty())
             })
             .copied();
 
         match (matching.next(), matching.next()) {
+            // one method found
             (Some(mi), None) | (None, Some(mi)) => Ok(mi),
-            (Some(_), Some(_)) => Err(FindMethodError::Many),
-            (None, None) => Err(FindMethodError::None),
+            // multiple methods found
+            (Some(mi1), Some(mi2)) => {
+                let found: Vec<FindMethodParameters> = vec![mi1, mi2]
+                    .into_iter()
+                    .chain(matching)
+                    .map(|mi| {
+                        let info = FindMethodParameters {
+                            ty_name: self.to_string(),
+                            method_name: name.to_string(),
+                            parameters: mi.parameters().iter().map(|t| t.to_string()).collect(),
+                        };
+                        info
+                    })
+                    .collect();
+
+                Err(FindMethodError::Many(found))
+            }
+            // none
+            _ => {
+                let info = FindMethodParameters {
+                    ty_name: self.to_string(),
+                    method_name: name.to_string(),
+                    // TODO!
+                    parameters: vec![format!("UNABLE TO PROVIDE! Count {}", P::COUNT)],
+                };
+                Err(FindMethodError::None(info))
+            }
         }
     }
 
@@ -237,17 +340,38 @@ impl Il2CppClass {
                 .filter(|mi| mi.name() == name && mi.parameters().len() == parameters_count)
                 .copied();
 
-            match match matching.next() {
+            match (matching.next(), matching.next()) {
+                // only one match
+                (Some(mi), None) => return Ok(mi),
+                // multiple matches
+                (Some(mi), Some(mi2)) => {
+                    let found = vec![mi, mi2]
+                        .into_iter()
+                        .chain(matching)
+                        .map(|mi| {
+                            let info = FindMethodParameters {
+                                ty_name: c.to_string(),
+                                method_name: name.to_string(),
+                                parameters: mi.parameters().iter().map(|t| t.to_string()).collect(),
+                            };
+                            info
+                        })
+                        .collect();
+
+                    return Err(FindMethodError::Many(found));
+                }
                 // If we have no matches, we continue to the parent
-                None => continue,
-                Some(mi) => (mi, matching.next()),
-            } {
-                (mi, None) => return Ok(mi),
-                _ => return Err(FindMethodError::Many),
+                _ => continue,
             }
         }
 
-        Err(FindMethodError::None)
+        let info = FindMethodParameters {
+            ty_name: self.to_string(),
+            method_name: name.to_string(),
+            parameters: vec![format!("UNABLE TO PROVIDE! Count {}", parameters_count)],
+        };
+
+        Err(FindMethodError::None(info))
     }
 
     /// Find a field belonging to the class or its parents by name
@@ -268,7 +392,7 @@ impl Il2CppClass {
 
     /// Instanciates a generic class template with the provided generic
     /// arguments
-    pub fn make_generic<G>(&self) -> Result<Option<&'static Self>, &mut Il2CppException>
+    pub fn make_generic<G>(&self) -> Result<Option<&'static Self>, Gc<Il2CppException>>
     where
         G: Generics,
     {
@@ -296,30 +420,36 @@ impl Il2CppClass {
 
     /// Invokes the `static` method with the given name using the given
     /// arguments, with type checking
-    pub fn invoke<A, R, const N: usize>(
-        &self,
-        name: &str,
-        args: A,
-    ) -> Result<R, &mut Il2CppException>
+    pub fn invoke<A, R, const N: usize>(&self, name: &str, args: A) -> crate::Result<R>
     where
         A: Arguments<N>,
         R: Returned,
     {
-        let method = self.find_static_method::<A, R, N>(name).unwrap();
+        let method = self
+            .find_static_method::<A, R, N>(name)
+            .unwrap_or_else(|e| {
+                panic!(
+                    "no matching methods found for non-void {}.{}({}) Cause: {e:?}",
+                    self, name, N
+                )
+            });
         unsafe { method.invoke_unchecked((), args) }
     }
 
     /// Invokes the `static void` method with the given name using the given
     /// arguments, with type checking
-    pub fn invoke_void<A, const N: usize>(
-        &self,
-        name: &str,
-        args: A,
-    ) -> Result<(), &mut Il2CppException>
+    pub fn invoke_void<A, const N: usize>(&self, name: &str, args: A) -> crate::Result<()>
     where
         A: Arguments<N>,
     {
-        let method = self.find_static_method::<A, (), N>(name).unwrap();
+        let method = self
+            .find_static_method::<A, (), N>(name)
+            .unwrap_or_else(|e| {
+                panic!(
+                    "no matching methods found for void {}.{}({}) Cause: {e:?}",
+                    self, name, N
+                )
+            });
         unsafe { method.invoke_unchecked((), args) }
     }
 
@@ -390,6 +520,11 @@ impl Il2CppClass {
 
     /// Whether the class is assignable from `other`
     pub fn is_assignable_from(&self, other: &Self) -> bool {
+        // optimize
+        if self == other {
+            return true;
+        }
+
         unsafe { raw::class_is_assignable_from(self.raw(), other.raw()) }
     }
 
@@ -467,16 +602,23 @@ impl<'a> From<&'a Il2CppType> for &'a Il2CppClass {
     }
 }
 
+/// No matching method were found
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct FindMethodParameters {
+    pub ty_name: String,
+    pub method_name: String,
+    pub parameters: Vec<String>,
+}
+
 /// Possible errors when looking up a method
-#[derive(Debug, thiserror::Error, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq, Hash)]
 pub enum FindMethodError {
-    /// No matching method were found
-    #[error("no matching methods found")]
-    None,
+    #[error("no matching methods found for {0}")]
+    None(FindMethodParameters),
 
     /// Multiple matching methods were found
-    #[error("multiple matching methods found")]
-    Many,
+    #[error("multiple matching methods found. {0:?}")]
+    Many(Vec<FindMethodParameters>),
 }
 
 #[cfg(feature = "cache")]
@@ -536,5 +678,17 @@ mod cache {
     thread_local! {
         pub(super) static CLASS_CACHE: RefCell<HashMap<StaticClassCacheKey, &'static super::Il2CppClass>> = Default::default();
         pub(super) static METHOD_CACHE: RefCell<HashMap<StaticMethodCacheKey, &'static super::MethodInfo>> = Default::default();
+    }
+}
+
+impl Display for FindMethodParameters {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}.{}({})",
+            self.ty_name,
+            self.method_name,
+            self.parameters.join(", ")
+        )
     }
 }

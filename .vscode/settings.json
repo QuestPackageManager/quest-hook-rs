@@ -1,7 +1,10 @@
 {
   "rust-analyzer.cargo.features": [
-    "unity2019",
-    "serde"
+    "il2cpp_v31",
+    "serde",
+    "util",
+    "cache",
+    "trace"
   ],
   "rust-analyzer.imports.granularity.group": "module"
 }

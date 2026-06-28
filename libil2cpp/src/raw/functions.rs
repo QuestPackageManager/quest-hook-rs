@@ -3,8 +3,8 @@
 use libloading::{Library, Symbol};
 use quest_hook_proc_macros::il2cpp_functions;
 use std::ffi::c_void;
-use std::sync::{LazyLock, OnceLock};
 use std::os::raw::c_char;
+use std::sync::{LazyLock, OnceLock};
 
 use super::{
     FieldInfo, Il2CppArray, Il2CppAssembly, Il2CppClass, Il2CppDomain, Il2CppException,
@@ -12,7 +12,22 @@ use super::{
     Il2CppString, Il2CppType, MethodInfo,
 };
 
-il2cpp_functions! {
+// https://katyscode.wordpress.com/2020/12/27/il2cpp-part-2/
+
+#[cfg(target_os = "android")]
+pub const IL2CPP_BINARY: &str = "libil2cpp.so";
+
+#[cfg(target_os = "linux")]
+pub const IL2CPP_BINARY: &str = "libil2cpp.so";
+
+#[cfg(target_os = "windows")]
+pub const IL2CPP_BINARY: &str = "GameAssembly.dll";
+
+#[cfg(target_os = "macos")]
+pub const IL2CPP_BINARY: &str = "GameAssembly.dylib";
+
+// functions get prefixed with "il2cpp_"
+il2cpp_functions! { IL2CPP_BINARY =>
     pub fn domain_get() -> &'static Il2CppDomain;
     pub fn domain_get_assemblies(domain: &Il2CppDomain, size: &mut usize) -> &'static [&'static Il2CppAssembly];
     pub fn assembly_get_image(assembly: &Il2CppAssembly) -> Option<&'static Il2CppImage>;
@@ -36,4 +51,7 @@ il2cpp_functions! {
     pub fn raise_exception(exc: &Il2CppException) -> !;
     pub fn resolve_icall(name: *const c_char) -> Il2CppMethodPointer;
     pub fn object_new(class: &Il2CppClass) -> &'static mut Il2CppObject;
+
+    pub fn value_box(klass: *mut Il2CppClass, data: *mut c_void) -> *mut Il2CppObject;
+    pub fn object_unbox(obj: *mut Il2CppObject) -> *mut c_void;
 }

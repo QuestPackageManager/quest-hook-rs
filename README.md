@@ -1,4 +1,4 @@
-# quest_hook
+# `quest_hook`
 
 A library for writing (mostly) memory safe mods for Unity il2cpp games
 
@@ -15,8 +15,8 @@ Despite its name and initial target and scope, this library supports modding mos
 
 ### Targets
 
-- Android ARMv8
-- Android ARMv7
+- Android `ARMv8`
+- Android `ARMv7`
 - Windows x64
 - Windows x86
 - Linux x64
@@ -90,7 +90,7 @@ This library is mainly developed using Visual Studio Code with [rust-analyzer](h
 
 ## License
 
-quest_hook is licensed under the [MIT License](./LICENSE).
+`quest_hook` is licensed under the [MIT License](./LICENSE).
 
 ## Credits
 

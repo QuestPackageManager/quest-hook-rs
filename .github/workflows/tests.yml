@@ -7,11 +7,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        unity: [unity2019, unity2018]
+        unity: [il2cpp_v31, il2cpp_v29, il2cpp_v24, unity2018]
         os: [windows-latest, ubuntu-latest]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
@@ -19,7 +19,7 @@ jobs:
           override: true
           components: clippy, rustfmt
 
-      - uses: actions/cache@v2
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/
@@ -60,7 +60,7 @@ jobs:
             ndk-target: armeabi-v7a
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: true
       - uses: actions-rs/toolchain@v1
@@ -73,9 +73,9 @@ jobs:
       - uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
-          ndk-version: r22
+          ndk-version: r29
 
-      - uses: actions/cache@v2
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/

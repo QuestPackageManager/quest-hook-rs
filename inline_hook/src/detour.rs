@@ -1,6 +1,6 @@
 use std::sync::OnceLock;
 
-use detour::RawDetour;
+use retour::RawDetour;
 
 /// A function hook that works across most platforms
 #[derive(Debug)]
@@ -40,5 +40,11 @@ impl Hook {
     /// installed
     pub fn original(&self) -> Option<*const ()> {
         self.detour.get().map(|d| d.trampoline() as *const ())
+    }
+}
+
+impl Default for Hook {
+    fn default() -> Self {
+        Self::new()
     }
 }

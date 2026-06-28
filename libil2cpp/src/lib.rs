@@ -1,4 +1,5 @@
-#![feature(once_cell, generic_associated_types, never_type)]
+#![feature(never_type)]
+#![feature(trait_alias)]
 #![doc(html_root_url = "https://stackdoubleflow.github.io/quest-hook-rs/libil2cpp")]
 #![warn(
     clippy::all,
@@ -8,7 +9,6 @@
     clippy::dbg_macro,
     clippy::debug_assert_with_mut_call,
     clippy::doc_markdown,
-    clippy::empty_enum,
     clippy::enum_glob_use,
     clippy::exit,
     clippy::expl_impl_clone_on_copy,
@@ -32,11 +32,9 @@
     clippy::map_err_ignore,
     clippy::map_flatten,
     clippy::map_unwrap_or,
-    clippy::match_on_vec_items,
     clippy::match_same_arms,
     clippy::match_wildcard_for_single_variants,
     clippy::mem_forget,
-    clippy::mismatched_target_os,
     clippy::mut_mut,
     clippy::mutex_integer,
     clippy::needless_borrow,
@@ -52,7 +50,8 @@
     clippy::string_add_assign,
     clippy::string_add,
     clippy::string_lit_as_bytes,
-    clippy::string_to_string,
+    clippy::mut_from_ref,
+    clippy::missing_transmute_annotations,
     clippy::todo,
     clippy::trait_duplication_in_bounds,
     clippy::unimplemented,
@@ -74,7 +73,12 @@
 
 //! Wrappers and raw bindings for Unity's libil2cpp
 
-#[cfg(not(any(feature = "unity2019", feature = "unity2018")))]
+#[cfg(not(any(
+    feature = "il2cpp_v31",
+    feature = "il2cpp_v29",
+    feature = "il2cpp_v24",
+    feature = "unity2018"
+)))]
 compile_error!("No Unity version selected");
 
 #[cfg(feature = "trace")]
@@ -85,17 +89,26 @@ pub use tracing::{debug, instrument};
 
 #[cfg(not(feature = "trace"))]
 macro_rules! debug {
-    ($_:tt) => {};
+    ($($tt:tt)*) => {};
 }
 #[cfg(not(feature = "trace"))]
 pub use quest_hook_proc_macros::identity as instrument;
 
 mod array;
+mod byref;
 mod class;
 mod exception;
 mod field_info;
+mod gc;
 mod method_info;
 mod object;
+mod valuetype;
+
+#[cfg_attr(
+    any(feature = "unity2018", feature = "il2cpp_v24"),
+    path = "parameter_info.rs"
+)]
+#[cfg_attr(any(feature = "il2cpp_v31"), path = "parameter_info_stub.rs")]
 mod parameter_info;
 pub mod raw;
 mod string;
@@ -106,16 +119,19 @@ mod typecheck;
 pub use quest_hook_proc_macros::{unsafe_impl_reference_type, unsafe_impl_value_type};
 
 pub use array::Il2CppArray;
+pub use byref::{ByRef, ByRefMut};
 pub use class::{FindMethodError, Il2CppClass};
 pub use exception::Il2CppException;
 pub use field_info::FieldInfo;
-pub use method_info::{Il2CppReflectionMethod, MethodInfo};
-pub use object::{Il2CppObject, ObjectExt};
+pub use gc::{Gc, GcType};
+pub use method_info::{Il2CppReflectionMethod, MethodInfo, Result, Void};
+pub use object::{Il2CppObject, ObjectExt, ObjectType};
 pub use parameter_info::ParameterInfo;
-pub use raw::{unbox, WrapRaw};
+pub use raw::{unbox, value_box, WrapRaw};
 pub use string::Il2CppString;
 pub use ty::{Builtin, Il2CppReflectionType, Il2CppType};
 pub use typecheck::callee::{Parameter, Parameters, Return, ThisParameter};
 pub use typecheck::caller::{Argument, Arguments, Returned, ThisArgument};
 pub use typecheck::generic::Generics;
 pub use typecheck::ty::Type;
+pub use valuetype::{ValueTypeExt, ValueTypePadding};

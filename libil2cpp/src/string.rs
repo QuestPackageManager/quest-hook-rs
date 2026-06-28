@@ -4,7 +4,7 @@ use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::string::FromUtf16Error;
 
-use crate::{raw, Il2CppObject, WrapRaw};
+use crate::{raw, Gc, Il2CppObject, WrapRaw};
 
 /// An il2cpp string
 #[repr(transparent)]
@@ -12,10 +12,10 @@ pub struct Il2CppString(raw::Il2CppString);
 
 impl Il2CppString {
     /// Creates a new string from a Rust string
-    pub fn new(s: impl AsRef<str>) -> &'static mut Self {
+    pub fn new(s: impl AsRef<str>) -> Gc<Self> {
         let b = s.as_ref().as_bytes();
         let s = unsafe { raw::string_new_len(b.as_ptr().cast(), b.len() as _) };
-        unsafe { Self::wrap_mut(s) }
+        unsafe { Self::wrap_mut(s).into() }
     }
 
     /// Converts the string to a Rust string, returning an error if its utf-16
@@ -74,16 +74,17 @@ impl AsMut<[u16]> for Il2CppString {
     }
 }
 
-impl<T> From<T> for &'static mut Il2CppString
-where
-    T: AsRef<str>,
-{
-    fn from(s: T) -> Self {
-        Il2CppString::new(s)
-    }
-}
+// TODO: Fix?
+// impl<T> From<T> for Gc<Il2CppString>
+// where
+//     T: AsRef<str>,
+// {
+//     fn from(s: T) -> Self {
+//         Il2CppString::new(s)
+//     }
+// }
 
-impl FromStr for &'static mut Il2CppString {
+impl FromStr for Gc<Il2CppString> {
     type Err = Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -104,7 +105,7 @@ where
     T: AsRef<str>,
 {
     fn eq(&self, other: &T) -> bool {
-        self.to_string().map_or(false, |s| s == other.as_ref())
+        self.to_string().is_ok_and(|s| s == other.as_ref())
     }
 }
 
@@ -122,12 +123,14 @@ impl fmt::Display for Il2CppString {
 
 #[cfg(feature = "serde")]
 mod serde {
+    use crate::Gc;
+
     use super::Il2CppString;
 
     use serde::de::{Deserialize, Deserializer};
     use serde::ser::{Serialize, Serializer};
 
-    impl<'de> Deserialize<'de> for &mut Il2CppString {
+    impl<'de> Deserialize<'de> for Gc<Il2CppString> {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: Deserializer<'de>,

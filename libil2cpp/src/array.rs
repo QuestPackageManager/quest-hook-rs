@@ -3,7 +3,7 @@ use std::mem::transmute;
 use std::ops::{Deref, DerefMut};
 use std::{fmt, ptr, slice};
 
-use crate::{raw, Il2CppClass, Il2CppObject, Type, WrapRaw};
+use crate::{raw, Gc, Il2CppClass, Il2CppObject, Type, WrapRaw};
 
 /// An il2cpp array
 #[repr(transparent)]
@@ -11,7 +11,7 @@ pub struct Il2CppArray<T: Type>(raw::Il2CppArray, PhantomData<[T]>);
 
 impl<T: Type> Il2CppArray<T> {
     /// Creates an array from an iterator
-    pub fn new<'a, I>(items: I) -> &'a mut Self
+    pub fn new<'a, I>(items: I) -> Gc<Self>
     where
         I: IntoIterator<Item = T::Held<'a>>,
         I::IntoIter: ExactSizeIterator<Item = T::Held<'a>>,
@@ -27,7 +27,7 @@ impl<T: Type> Il2CppArray<T> {
                 ptr::write_unaligned(ptr, elem);
             }
         }
-        unsafe { Self::wrap_mut(arr) }
+        unsafe { Self::wrap_mut(arr).into() }
     }
 
     /// Slice of values in the array
@@ -122,18 +122,20 @@ impl<T: Type> DerefMut for Il2CppArray<T> {
 
 #[cfg(feature = "serde")]
 mod serde {
+    use crate::Gc;
+
     use super::{fmt, ptr, raw, Il2CppArray, PhantomData, Type, WrapRaw};
 
     use serde::de::{Deserialize, Deserializer, SeqAccess, Visitor};
     use serde::ser::{Serialize, Serializer};
 
-    struct ArrayVisitor<T: Type>(PhantomData<Il2CppArray<T>>);
+    struct ArrayVisitor<T: Type>(PhantomData<Gc<Il2CppArray<T>>>);
 
     impl<'de, T: Type> ArrayVisitor<T>
     where
         T::Held<'de>: Deserialize<'de>,
     {
-        fn visit_self<A>(mut seq: A, len: usize) -> Result<&'de mut Il2CppArray<T>, A::Error>
+        fn visit_self<A>(mut seq: A, len: usize) -> Result<Gc<Il2CppArray<T>>, A::Error>
         where
             A: SeqAccess<'de>,
         {
@@ -146,7 +148,7 @@ mod serde {
                     ptr::write_unaligned(ptr, seq.next_element()?.unwrap());
                 }
             }
-            Ok(unsafe { Il2CppArray::wrap_mut(arr) })
+            Ok(unsafe { Il2CppArray::wrap_mut(arr).into() })
         }
 
         fn visit_vec<A>(mut seq: A) -> Result<Vec<T::Held<'de>>, A::Error>
@@ -165,7 +167,7 @@ mod serde {
     where
         T::Held<'de>: Deserialize<'de>,
     {
-        type Value = &'de mut Il2CppArray<T>;
+        type Value = Gc<Il2CppArray<T>>;
 
         fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
             formatter.write_str("an array of C# compatible values")
@@ -182,7 +184,7 @@ mod serde {
         }
     }
 
-    impl<'de, T: Type> Deserialize<'de> for &'de mut Il2CppArray<T>
+    impl<'de, T: Type> Deserialize<'de> for Gc<Il2CppArray<T>>
     where
         T::Held<'de>: Deserialize<'de>,
     {

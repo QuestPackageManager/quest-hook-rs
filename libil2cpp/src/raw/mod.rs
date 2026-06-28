@@ -5,14 +5,26 @@
 
 mod functions;
 
-#[cfg_attr(feature = "unity2019", path = "types_2019.rs")]
+#[cfg(not(feature = "bindgen"))]
+#[cfg_attr(feature = "il2cpp_v31", path = "types_v31/mod.rs")]
+#[cfg_attr(feature = "il2cpp_v29", path = "types_v29.rs")]
+#[cfg_attr(feature = "il2cpp_v24", path = "types_v24.rs")]
 #[cfg_attr(feature = "unity2018", path = "types_2018.rs")]
+mod types;
+
+#[cfg(feature = "bindgen")]
+#[path = "bindgen.rs"]
 mod types;
 
 pub use functions::*;
 pub use types::*;
 
-use std::mem::{size_of, transmute};
+use std::{
+    ffi::c_void,
+    mem::{size_of, transmute},
+};
+
+use crate::Type;
 
 /// Safe wrapper around a raw il2cpp type which can be used in its place
 ///
@@ -85,9 +97,30 @@ pub unsafe trait WrapRaw: Sized {
 ///
 /// # Safety
 /// The object must be of the valid type and cointain a valid value.
+///
+/// `Object::Unbox` (the underlying il2cpp function) does not allocate memory,
+/// so the returned value is a copy of the value stored in the object.
 #[inline]
 pub unsafe fn unbox<T>(object: &Il2CppObject) -> T {
     let address = object as *const Il2CppObject as usize;
     let ptr = (address + size_of::<Il2CppObject>()) as *const T;
     ptr.read_unaligned()
+}
+
+/// Boxes a value type into an [`Il2CppObject`]
+/// # Safety
+/// The provided value must be a valid value of the given type.
+///
+/// `Object::Box` (the underlying il2cpp function) allocates memory for the
+/// boxed object, so the returned pointer is managed by the il2cpp GC
+#[inline]
+pub unsafe fn value_box<T: Type>(this: &mut T) -> *mut T {
+    // TODO: WrapRaw for T?
+    let boxed = functions::value_box(
+        T::class().raw() as *const Il2CppClass as *mut Il2CppClass,
+        (this as *mut T).cast::<c_void>(),
+    )
+    .cast::<T>();
+
+    boxed
 }

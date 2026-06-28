@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/QuestPackageManager/QPM.Package/refs/heads/main/qpm.schema.json",
+  "version": "0.4.0",
+  "sharedDir": "shared",
+  "dependenciesDir": "extern",
+  "info": {
+    "name": "libil2cpp-rs",
+    "id": "libil2cpp-rs",
+    "version": "0.1.0",
+    "url": null,
+    "additionalData": {
+      "cmake": false
+    }
+  },
+  "workspace": {
+    "scripts": {},
+    "qmodIncludeDirs": [],
+    "qmodIncludeFiles": [],
+    "qmodOutput": null
+  },
+  "dependencies": [
+    {
+      "id": "libil2cpp",
+      "versionRange": "^0.4.0",
+      "additionalData": {}
+    }
+  ]
+}

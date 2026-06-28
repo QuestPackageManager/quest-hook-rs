@@ -1,4 +1,4 @@
-use heck::{CamelCase, SnakeCase};
+use heck::{ToLowerCamelCase, ToSnakeCase};
 use proc_macro::TokenStream;
 use proc_macro2::{Group, TokenStream as TokenStream2, TokenTree as TokenTree2};
 use quote::{format_ident, quote, quote_spanned, ToTokens};
@@ -147,7 +147,7 @@ impl Metadata {
 
     fn struct_name(&self) -> Ident {
         let hook_name = self.hook_name().to_string();
-        let struct_name = hook_name.to_camel_case();
+        let struct_name = hook_name.to_lower_camel_case();
         format_ident!("{}Struct", struct_name)
     }
 
@@ -466,7 +466,7 @@ fn unit_ty() -> Type {
 }
 
 fn attr_is(attr: &Attribute, ident: &str) -> bool {
-    matches!(attr.path.get_ident(), Some(ai) if ai == ident)
+    matches!(attr.path().get_ident(), Some(ai) if ai == ident)
 }
 
 fn staticify(tokens: impl ToTokens) -> TokenStream2 {

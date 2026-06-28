@@ -1,0 +1,42 @@
+{
+  "$schema": "https://raw.githubusercontent.com/QuestPackageManager/QPM.Package/refs/heads/main/qpm.shared.schema.json",
+  "config": {
+    "version": "0.4.0",
+    "sharedDir": "shared",
+    "dependenciesDir": "extern",
+    "info": {
+      "name": "flamingo-rs",
+      "id": "flamingo-rs",
+      "version": "0.1.0",
+      "url": null,
+      "additionalData": {
+        "cmake": false
+      }
+    },
+    "workspace": {
+      "scripts": {},
+      "qmodIncludeDirs": [],
+      "qmodIncludeFiles": [],
+      "qmodOutput": null
+    },
+    "dependencies": [
+      {
+        "id": "flamingo",
+        "versionRange": "^1.2.0",
+        "additionalData": {}
+      }
+    ]
+  },
+  "restoredDependencies": [
+    {
+      "dependency": {
+        "id": "flamingo",
+        "versionRange": "=1.2.0",
+        "additionalData": {
+          "overrideSoName": "libflamingo.so"
+        }
+      },
+      "version": "1.2.0"
+    }
+  ]
+}

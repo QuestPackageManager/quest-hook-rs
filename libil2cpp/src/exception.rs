@@ -1,7 +1,7 @@
-use std::fmt;
+use std::fmt::{self, Debug, Display, Formatter};
 use std::ops::{Deref, DerefMut};
 
-use crate::{raw, Il2CppObject, Il2CppString, WrapRaw};
+use crate::{raw, Gc, Il2CppObject, Il2CppString, WrapRaw};
 
 /// An il2cpp exception
 #[repr(transparent)]
@@ -100,3 +100,10 @@ impl fmt::Debug for Il2CppException {
 
 impl std::error::Error for Il2CppException {}
 impl std::error::Error for &mut Il2CppException {}
+impl std::error::Error for Gc<Il2CppException> {}
+
+impl Display for Gc<Il2CppException> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Display::fmt(&**self, f)
+    }
+}

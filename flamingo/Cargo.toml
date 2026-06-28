@@ -1,0 +1,14 @@
+[package]
+name = "flamingo"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cfg-if = "1"
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+retour = "0.4.0-alpha.3"
+
+[build-dependencies]
+cc = "1"
+bindgen = "0.72"

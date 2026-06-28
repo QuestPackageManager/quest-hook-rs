@@ -8,7 +8,7 @@ edition = "2021"
 cfg-if = "1"
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
-detour = "0.8"
+retour = "0.4.0-alpha.3"
 
 [build-dependencies]
 cc = "1"

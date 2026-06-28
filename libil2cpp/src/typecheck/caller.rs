@@ -3,7 +3,8 @@ use std::ffi::c_void;
 use std::mem::transmute;
 use std::ptr::null_mut;
 
-use crate::{Builtin, Il2CppObject, Il2CppType, MethodInfo, Type};
+use crate::byref::{ByRef, ReffableType};
+use crate::{Builtin, Gc, GcType, Il2CppObject, Il2CppType, MethodInfo, Type};
 
 /// Trait implemented by types that can be used as a C# `this` arguments
 ///
@@ -102,6 +103,49 @@ where
         unsafe { transmute((self as *mut Self).read()) }
     }
 }
+unsafe impl<T> ThisArgument for *mut T
+where
+    T: Type,
+{
+    type Type = T;
+
+    fn matches(method: &MethodInfo) -> bool {
+        T::matches_this_argument(method)
+    }
+
+    fn invokable(&mut self) -> *mut c_void {
+        unsafe { transmute((self as *mut Self).read()) }
+    }
+}
+unsafe impl<T> ThisArgument for Gc<T>
+where
+    *mut T: GcType,
+    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+{
+    type Type = T;
+
+    fn matches(method: &MethodInfo) -> bool {
+        T::matches_this_argument(method)
+    }
+
+    fn invokable(&mut self) -> *mut c_void {
+        unsafe { transmute((self as *mut Self).read()) }
+    }
+}
+unsafe impl<T> ThisArgument for ByRef<T>
+where
+    T: ReffableType,
+{
+    type Type = T;
+
+    fn matches(method: &MethodInfo) -> bool {
+        T::matches_this_argument(method)
+    }
+
+    fn invokable(&mut self) -> *mut c_void {
+        unsafe { transmute((self as *mut Self).read()) }
+    }
+}
 
 unsafe impl<T> ThisArgument for &mut T
 where
@@ -146,6 +190,22 @@ where
         unsafe { transmute((self as *mut Self).read()) }
     }
 }
+// TODO: Remove this once rustfmt stops dropping generics on GATs
+#[rustfmt::skip]
+unsafe impl<T> Argument for *mut T
+where
+    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+{
+    type Type = T;
+
+    fn matches(ty: &Il2CppType) -> bool {
+        T::matches_reference_argument(ty)
+    }
+
+    fn invokable(&mut self) -> *mut c_void {
+        unsafe { transmute((self as *mut Self).read()) }
+    }
+}
 
 // TODO: Remove this once rustfmt stops dropping generics on GATs
 #[rustfmt::skip]
@@ -161,6 +221,44 @@ where
 
     fn invokable(&mut self) -> *mut c_void {
         (*self as *mut T).cast()
+    }
+}
+
+#[rustfmt::skip]
+unsafe impl<T> Argument for Gc<T>
+where 
+    *mut T: GcType,
+    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+
+{
+    type Type = T;
+
+    fn matches(ty: &Il2CppType) -> bool {
+        T::matches_reference_argument(ty)
+    }
+
+    fn invokable(&mut self) -> *mut c_void {
+        <*mut T as Argument>::invokable(&mut self.get_pointer_mut())
+    }
+}
+
+#[rustfmt::skip]
+unsafe impl< T> Argument for ByRef< T>
+where 
+    T: ReffableType,
+{
+    type Type = T;
+
+    // matches_reference_argument will always return true if ref
+    // regardless if its value type or ref type
+    // will also class check
+    fn matches(ty: &Il2CppType) -> bool {
+        T::matches_reference_argument(ty)
+    }
+
+    fn invokable(&mut self) -> *mut c_void {
+        unsafe { transmute((self as *mut Self).read()) }
+        
     }
 }
 
@@ -180,10 +278,71 @@ where
         unsafe { transmute(object) }
     }
 }
+#[rustfmt::skip]
+unsafe impl<T> Returned for Gc<T>
+where *mut T: GcType,
+    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+{
+    type Type = T;
+
+    fn matches(ty: &Il2CppType) -> bool {
+        T::matches_returned(ty)
+    }
+
+    fn from_object(object: Option<&mut Il2CppObject>) -> Self {
+        unsafe { transmute(object) }
+    }
+}
+// Can we even return refs?
+#[rustfmt::skip]
+unsafe impl<T> Returned for ByRef<T>
+where T: ReffableType,
+{
+    type Type = T;
+
+    fn matches(ty: &Il2CppType) -> bool {
+        T::matches_returned(ty)
+    }
+
+    fn from_object(object: Option<&mut Il2CppObject>) -> Self {
+        unsafe { transmute(object) }
+    }
+}
+#[rustfmt::skip]
+unsafe impl<T> Returned for *mut T
+where
+    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+
+{
+    type Type = T;
+
+    fn matches(ty: &Il2CppType) -> bool {
+        T::matches_returned(ty)
+    }
+
+    fn from_object(object: Option<&mut Il2CppObject>) -> Self {
+        unsafe { transmute(object) }
+    }
+}
 
 // TODO: Remove this once rustfmt stops dropping generics on GATs
 #[rustfmt::skip]
 unsafe impl<T> Returned for Option<&T>
+where
+    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+{
+    type Type = T;
+
+    fn matches(ty: &Il2CppType) -> bool {
+        T::matches_returned(ty)
+    }
+
+    fn from_object(object: Option<&mut Il2CppObject>) -> Self {
+        unsafe { transmute(object) }
+    }
+}
+#[rustfmt::skip]
+unsafe impl<T> Returned for *const T
 where
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
