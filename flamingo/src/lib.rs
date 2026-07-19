@@ -2,12 +2,6 @@
 //! A cross platform function hooking abstraction, working across Windows,
 //! Linux, macOS and Android
 
-/// C API for Flamingo
-pub mod flamingo_c_api;
-
-// mod aarch64_linux_android;
-// pub use crate::aarch64_linux_android::*;
-
 use cfg_if::cfg_if;
 cfg_if! {
     if #[cfg(all(target_arch = "aarch64", target_os = "android"))] {

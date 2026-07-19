@@ -1,8 +1,8 @@
-use std::ffi::{CString, c_void};
+use std::ffi::c_void;
 use std::ptr::null_mut;
 use std::sync::atomic::{AtomicPtr, Ordering};
 
-use crate::flamingo_c_api::{self, flamingo_make_name};
+use flamingo_rs::HookBuilder;
 
 /// A function hook specific to `ARMv8` Android
 #[derive(Debug)]
@@ -24,20 +24,20 @@ impl Hook {
     /// # Safety
     /// `target` and `hook` must have the same signature and calling convention
     pub unsafe fn install(&self, target: *const (), hook: *const ()) -> bool {
-        let mut original: *mut c_void = null_mut();
+        let installed =
+            unsafe { HookBuilder::new().install(target as *mut u32, hook as *mut c_void) };
 
-        let name_metadata =
-            unsafe { flamingo_make_name(CString::new("unknown").unwrap().as_ptr()) };
-
-        unsafe {
-            flamingo_c_api::flamingo_install_hook_no_name(
-                hook as *mut c_void,
-                target as *mut u32,
-                &mut original,
-            )
+        let Ok(installed) = installed else {
+            return false;
         };
 
+        let original = installed.original().map_or(null_mut(), |p| p as *mut c_void);
         self.original.store(original, Ordering::SeqCst);
+
+        // The hook is meant to live for the rest of the process, so leak the
+        // handle instead of uninstalling it when it goes out of scope.
+        std::mem::forget(installed);
+
         true
     }
 
