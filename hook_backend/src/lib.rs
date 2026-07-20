@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://stackdoubleflow.github.io/quest-hook-rs/inline_hook")]
+#![doc(html_root_url = "https://stackdoubleflow.github.io/quest-hook-rs/hook_backend")]
 #![warn(
     clippy::all,
     clippy::await_holding_lock,
@@ -70,19 +70,42 @@
 
 //! A cross platform function hooking abstraction, working across Windows,
 //! Linux, macOS and Android
+//!
+//! The `Hook` implementation is chosen at compile time via Cargo features:
+//! - `inline_hook`: a vendored And64InlineHook/inlineHook.c backend for
+//!   AArch64 and ARMv7 Android.
+//! - `flamingo`: a [`flamingo_rs`] backend for AArch64 Android.
+//! - `retour`: a [`retour`] backend, used on non-Android targets.
 
 use cfg_if::cfg_if;
 
+#[cfg(all(
+    target_arch = "aarch64",
+    target_os = "android",
+    feature = "inline_hook",
+    feature = "flamingo"
+))]
+compile_error!(
+    "hook_backend: enable only one of `inline_hook` or `flamingo` for aarch64-android"
+);
+
 cfg_if! {
-    if #[cfg(all(target_arch = "aarch64", target_os = "android"))] {
+    if #[cfg(all(target_arch = "aarch64", target_os = "android", feature = "flamingo"))] {
+        mod aarch64_flamingo;
+        pub use crate::aarch64_flamingo::*;
+    } else if #[cfg(all(target_arch = "aarch64", target_os = "android", feature = "inline_hook"))] {
         mod aarch64_linux_android;
         pub use crate::aarch64_linux_android::*;
-    } else if #[cfg(all(target_arch = "arm", target_os = "android"))] {
+    } else if #[cfg(all(target_arch = "arm", target_os = "android", feature = "inline_hook"))] {
         mod armv7_linux_androideabi;
         pub use crate::armv7_linux_androideabi::*;
-    } else {
+    } else if #[cfg(feature = "retour")] {
         mod detour;
         pub use crate::detour::*;
+    } else {
+        compile_error!(
+            "hook_backend: no hooking backend feature enabled for this target; enable `inline_hook`, `flamingo`, or `retour`"
+        );
     }
 }
 

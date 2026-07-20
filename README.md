@@ -47,12 +47,12 @@ crate-type = ["cdylib"]
 quest_hook = { git = "https://github.com/StackDoubleFlow/quest-hook-rs.git" }
 ```
 
-The default feature set (`il2cpp_v31 + util + cache + inline_hook`) is a sensible starting point.
+The default feature set (`il2cpp_v31 + util + cache + inline_hook + retour`) is a sensible starting point.
 To target an older game, disable the default il2cpp version and enable the correct one:
 
 ```toml
 [dependencies]
-quest_hook = { git = "https://github.com/StackDoubleFlow/quest-hook-rs.git", default-features = false, features = ["il2cpp_v29", "util", "cache", "inline_hook"] }
+quest_hook = { git = "https://github.com/StackDoubleFlow/quest-hook-rs.git", default-features = false, features = ["il2cpp_v29", "util", "cache", "inline_hook", "retour"] }
 ```
 
 A nightly toolchain can be pinned project-wide with a `rust-toolchain.toml`:
@@ -101,8 +101,9 @@ See the [`examples/`](./examples/) directory for more complete examples includin
 | `unity2018` | | Unity 2018 legacy alias for `il2cpp_v24` |
 | `util` | ✓ | `setup()` helper — logging + panic handler via `tracing` |
 | `cache` | ✓ | Cache class/method lookups for faster repeated access |
-| `inline_hook` | ✓ | Function hooking via `inline_hook` / `flamingo` |
-| `flamingo` | | Use the Flamingo native hooking library on Android |
+| `inline_hook` | ✓ | Function hooking on Android via a vendored inline-hook backend |
+| `flamingo` | | Function hooking on Android AArch64 via the Flamingo native hooking library |
+| `retour` | ✓ | Function hooking on Windows/Linux/macOS via the `retour` crate |
 | `bindgen` | ✓ | Generate il2cpp bindings at build time via `bindgen` |
 | `serde` | | `Serialize`/`Deserialize` for il2cpp types |
 | `trace` | | `tracing` instrumentation inside the library internals |
@@ -112,8 +113,7 @@ See the [`examples/`](./examples/) directory for more complete examples includin
 | Crate | Description |
 |-------|-------------|
 | [`libil2cpp`](./libil2cpp/) | Safe wrappers and raw bindings for Unity's libil2cpp |
-| [`inline_hook`](./inline_hook/) | Cross-platform inline function hooking |
-| [`flamingo`](./flamingo/) | Rust bindings for the Flamingo Android hooking library |
+| [`hook_backend`](./hook_backend/) | Cross-platform inline function hooking (`inline_hook` / `flamingo` / `retour` backends) |
 | [`proc_macros`](./proc_macros/) | The `#[hook]` macro and other derive helpers |
 | [`quest_build_helper`](./quest_build_helper/) | Build-script utilities for Quest mod projects |
 

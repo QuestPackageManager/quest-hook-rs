@@ -86,9 +86,4 @@ pub use libil2cpp;
 pub use quest_hook_proc_macros::hook;
 
 #[doc(hidden)]
-#[cfg(feature = "inline_hook")]
-pub use inline_hook;
-
-#[doc(hidden)]
-#[cfg(feature = "flamingo")]
-pub use flamingo;
+pub use hook_backend;
