@@ -77,9 +77,9 @@ jobs:
           - arch: armv8
             rust-target: aarch64-linux-android
             ndk-target: arm64-v8a
-          - arch: armv7
-            rust-target: armv7-linux-androideabi
-            ndk-target: armeabi-v7a
+          # - arch: armv7
+          #   rust-target: armv7-linux-androideabi
+          #   ndk-target: armeabi-v7a
 
     steps:
       - uses: actions/checkout@v4
