@@ -15,12 +15,12 @@ extern "C" {
 /// Only a single hook may be installed per target; `name` and `priority`
 /// are accepted for API parity with other backends but otherwise ignored
 #[derive(Debug)]
-pub struct Hook {
+pub struct FunctionHook {
     target: AtomicPtr<()>,
     original: AtomicPtr<u32>,
 }
 
-impl Hook {
+impl FunctionHook {
     /// Creates a new, unitialized hook
     pub const fn new() -> Self {
         Self {

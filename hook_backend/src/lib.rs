@@ -71,7 +71,8 @@
 //! A cross platform function hooking abstraction, working across Windows,
 //! Linux, macOS and Android
 //!
-//! The `Hook` implementation is chosen at compile time via Cargo features:
+//! The `FunctionHook` implementation is chosen at compile time via Cargo
+//! features:
 //! - `inline_hook`: a vendored And64InlineHook/inlineHook.c backend for
 //!   AArch64 and ARMv7 Android.
 //! - `flamingo`: a [`flamingo_rs`] backend for AArch64 Android.
@@ -81,7 +82,7 @@ use cfg_if::cfg_if;
 
 /// Identifies a hook by name and namespace.
 ///
-/// Passed to `Hook::install` so that other hooks targeting the same address
+/// Passed to `FunctionHook::install` so that other hooks targeting the same address
 /// can order themselves relative to it via [`Priority`].
 #[derive(Debug, Clone, Copy)]
 pub struct HookName {
@@ -120,7 +121,7 @@ pub struct Priority {
     pub after: Vec<HookFilter>,
 }
 
-/// Why `Hook::uninstall` failed.
+/// Why `FunctionHook::uninstall` failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UninstallError {
     /// The hook was never installed, or was already uninstalled.
@@ -178,11 +179,11 @@ cfg_if! {
 mod tests {
     use std::mem::transmute;
 
-    use super::{Hook, HookName, Priority, UninstallError};
+    use super::{FunctionHook, HookName, Priority, UninstallError};
 
     #[test]
     fn target_and_original() {
-        static HOOK: Hook = Hook::new();
+        static HOOK: FunctionHook = FunctionHook::new();
         const NAME: HookName = HookName {
             namespace: "hook_backend",
             name: "target_and_original",
@@ -215,7 +216,7 @@ mod tests {
 
     #[test]
     fn uninstall_restores_the_original_and_can_only_run_once() {
-        static HOOK: Hook = Hook::new();
+        static HOOK: FunctionHook = FunctionHook::new();
         const NAME: HookName = HookName {
             namespace: "hook_backend",
             name: "uninstall_restores_the_original_and_can_only_run_once",
@@ -247,7 +248,7 @@ mod tests {
 
     #[test]
     fn uninstall_without_install_fails() {
-        static HOOK: Hook = Hook::new();
+        static HOOK: FunctionHook = FunctionHook::new();
 
         assert_eq!(
             unsafe { HOOK.uninstall() },

@@ -9,11 +9,11 @@ use crate::{HookName, Priority, UninstallError};
 /// Only a single hook may be installed per target; `name` and `priority`
 /// are accepted for API parity with other backends but otherwise ignored
 #[derive(Debug)]
-pub struct Hook {
+pub struct FunctionHook {
     detour: OnceLock<RawDetour>,
 }
 
-impl Hook {
+impl FunctionHook {
     /// Creates a new, unitialized hook
     pub const fn new() -> Self {
         Self {
@@ -68,7 +68,7 @@ impl Hook {
     }
 }
 
-impl Default for Hook {
+impl Default for FunctionHook {
     fn default() -> Self {
         Self::new()
     }

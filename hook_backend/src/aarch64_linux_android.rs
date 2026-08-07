@@ -14,11 +14,11 @@ extern "C" {
 /// are accepted for API parity with other backends but otherwise ignored.
 /// Prefer the `flamingo` backend if multiple hooks need to share a target
 #[derive(Debug)]
-pub struct Hook {
+pub struct FunctionHook {
     original: AtomicPtr<c_void>,
 }
 
-impl Hook {
+impl FunctionHook {
     /// Creates a new, unitialized hook
     pub const fn new() -> Self {
         Self {

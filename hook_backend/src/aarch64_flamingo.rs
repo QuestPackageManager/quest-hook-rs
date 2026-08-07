@@ -11,11 +11,11 @@ use crate::{HookFilter, HookName, Priority, UninstallError};
 /// A function hook specific to `ARMv8` Android, supporting multiple hooks
 /// per target ordered by [`Priority`]
 #[derive(Debug, Default)]
-pub struct Hook {
+pub struct FunctionHook {
     installed: Mutex<Option<InstalledHook>>,
 }
 
-impl Hook {
+impl FunctionHook {
     /// Creates a new, unitialized hook
     pub const fn new() -> Self {
         Self {

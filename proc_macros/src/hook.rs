@@ -456,7 +456,7 @@ impl Metadata {
 
         quote! {
             #vis struct #struct_name {
-                hook: ::quest_hook::hook_backend::Hook,
+                hook: ::quest_hook::hook_backend::FunctionHook,
             }
         }
     }
@@ -469,7 +469,7 @@ impl Metadata {
         quote! {
             #[allow(non_upper_case_globals)]
             #vis static #name: #struct_name = #struct_name {
-                hook: ::quest_hook::hook_backend::Hook::new(),
+                hook: ::quest_hook::hook_backend::FunctionHook::new(),
             };
         }
     }
