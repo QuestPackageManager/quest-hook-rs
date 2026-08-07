@@ -73,8 +73,8 @@
 //!
 //! The `FunctionHook` implementation is chosen at compile time via Cargo
 //! features:
-//! - `inline_hook`: a vendored And64InlineHook/inlineHook.c backend for
-//!   AArch64 and ARMv7 Android.
+//! - `inline_hook`: a vendored And64InlineHook/inlineHook.c backend for AArch64
+//!   and ARMv7 Android.
 //! - `flamingo`: a [`flamingo_rs`] backend for AArch64 Android.
 //! - `retour`: a [`retour`] backend, used on non-Android targets.
 
@@ -82,8 +82,8 @@ use cfg_if::cfg_if;
 
 /// Identifies a hook by name and namespace.
 ///
-/// Passed to `FunctionHook::install` so that other hooks targeting the same address
-/// can order themselves relative to it via [`Priority`].
+/// Passed to `FunctionHook::install` so that other hooks targeting the same
+/// address can order themselves relative to it via [`Priority`].
 #[derive(Debug, Clone, Copy)]
 pub struct HookName {
     /// The namespace the hook was declared under.
@@ -151,9 +151,7 @@ impl std::error::Error for UninstallError {}
     feature = "inline_hook",
     feature = "flamingo"
 ))]
-compile_error!(
-    "hook_backend: enable only one of `inline_hook` or `flamingo` for aarch64-android"
-);
+compile_error!("hook_backend: enable only one of `inline_hook` or `flamingo` for aarch64-android");
 
 cfg_if! {
     if #[cfg(all(target_arch = "aarch64", target_os = "android", feature = "flamingo"))] {

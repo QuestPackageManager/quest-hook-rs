@@ -58,8 +58,7 @@ impl FunctionHook {
             builder = builder.after(filter);
         }
 
-        let installed =
-            unsafe { builder.install(target as *mut Instruction, hook as *mut c_void) };
+        let installed = unsafe { builder.install(target as *mut Instruction, hook as *mut c_void) };
         match installed {
             Ok(installed) => {
                 *self.installed.lock().unwrap() = Some(installed);

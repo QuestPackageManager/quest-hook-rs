@@ -9,12 +9,13 @@ pub fn qpm_bin() -> PathBuf {
 }
 
 /// Restores QPM packages in the given path.
-/// If `copy_to_out` is true, it will first copy the qpm.json and qpm.shared.json
-/// from the manifest directory to the OUT_DIR, and then restore from there.
-/// 
+/// If `copy_to_out` is true, it will first copy the qpm.json and
+/// qpm.shared.json from the manifest directory to the OUT_DIR, and then restore
+/// from there.
+///
 /// Errors if the qpm.json file is not found or if the QPM command fails.
-/// 
-/// Returns the path where the packages were restored. 
+///
+/// Returns the path where the packages were restored.
 pub fn restore(path: &Path, copy_to_out: bool) -> Result<PathBuf, Box<dyn std::error::Error>> {
     if copy_to_out {
         let out_path = PathBuf::from(env::var("OUT_DIR").unwrap()).join("qpm");

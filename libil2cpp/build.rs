@@ -41,9 +41,24 @@ fn run_bindgen() {
     println!("cargo:rerun-if-changed=wrapper.h");
     let bindings = bindgen::Builder::default()
         .header("wrapper.h")
-        .clang_arg(format!("-I{}", manifest.join("extern/includes/libil2cpp/il2cpp/libil2cpp").display()))
-        .clang_arg(format!("-I{}", manifest.join("extern/includes/libil2cpp/il2cpp/external/baselib/Include").display()))
-        .clang_arg(format!("-I{}", manifest.join("extern/includes/libil2cpp/il2cpp/external/baselib/Platforms/Android/Include").display()))
+        .clang_arg(format!(
+            "-I{}",
+            manifest
+                .join("extern/includes/libil2cpp/il2cpp/libil2cpp")
+                .display()
+        ))
+        .clang_arg(format!(
+            "-I{}",
+            manifest
+                .join("extern/includes/libil2cpp/il2cpp/external/baselib/Include")
+                .display()
+        ))
+        .clang_arg(format!(
+            "-I{}",
+            manifest
+                .join("extern/includes/libil2cpp/il2cpp/external/baselib/Platforms/Android/Include")
+                .display()
+        ))
         .clang_arg(format!("-I{}", manifest.join("extern/includes").display()))
         .clang_arg(format!("-I{}", manifest.display()))
         .clang_arg("-v")

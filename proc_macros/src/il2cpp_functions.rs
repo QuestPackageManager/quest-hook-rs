@@ -1,8 +1,8 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
-use syn::{Error, FnArg, ForeignItemFn, LitByteStr, PatType, Signature};
 use syn::Token;
+use syn::{Error, FnArg, ForeignItemFn, LitByteStr, PatType, Signature};
 
 pub struct Input(syn::Expr, Vec<ForeignItemFn>);
 
