@@ -61,7 +61,7 @@ impl PartialEq for Il2CppType {
         unsafe { self.raw().data.klassIndex == other.raw().data.klassIndex }
     }
 
-    #[cfg(feature = "il2cpp_v31")]
+    #[cfg(any(feature = "il2cpp_v31", feature = "il2cpp_v29"))]
     fn eq(&self, other: &Self) -> bool {
         unsafe { self.raw().data.__klassIndex == other.raw().data.__klassIndex }
     }
@@ -92,6 +92,7 @@ macro_rules! builtins {
         #[doc = "Builtin C# types"]
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "il2cpp_v31", repr(u32))]
+        #[cfg_attr(feature = "il2cpp_v29", repr(u32))]
         #[cfg_attr(feature = "il2cpp_v24", repr(u32))]
         #[cfg_attr(feature = "unity2018", repr(i32))]
         pub enum Builtin {
@@ -106,6 +107,9 @@ macro_rules! builtins {
             #[inline]
             pub fn is_builtin(&self, builtin: Builtin) -> bool {
                 #[cfg(feature = "il2cpp_v31")]
+                { self.raw().type_() == (builtin as u32).try_into().unwrap() }
+
+                #[cfg(feature = "il2cpp_v29")]
                 { self.raw().type_() == (builtin as u32).try_into().unwrap() }
 
                 #[cfg(feature = "il2cpp_v24")]

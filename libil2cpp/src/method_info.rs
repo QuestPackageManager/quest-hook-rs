@@ -12,6 +12,9 @@ use crate::{
 
 #[cfg(feature = "il2cpp_v31")]
 type ParameterInfoSlice<'a> = &'a [ParameterInfo];
+
+#[cfg(feature = "il2cpp_v29")]
+type ParameterInfoSlice<'a> = &'a [ParameterInfo];
 #[cfg(feature = "il2cpp_v24")]
 type ParameterInfoSlice<'a> = &'a [ParameterInfo];
 #[cfg(feature = "unity2018")]

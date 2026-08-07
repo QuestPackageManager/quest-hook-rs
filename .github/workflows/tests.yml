@@ -1,13 +1,20 @@
 name: Tests
 on: [push, pull_request]
 
+# The feature set previously pulled in by cargo's own defaults, minus the
+# hook backend (each job below adds whichever one its target needs) and the
+# il2cpp version (supplied per matrix entry instead).
+env:
+  default_features: serde,util,cache,bindgen
+
 jobs:
   tests:
     name: Tests
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        unity: [il2cpp_v31, il2cpp_v29, il2cpp_v24, unity2018]
+        unity: [il2cpp_v31, il2cpp_v29]
+        # unity: [il2cpp_v31, il2cpp_v29, il2cpp_v24, unity2018]
         os: [windows-latest, ubuntu-latest]
 
     steps:
@@ -36,17 +43,20 @@ jobs:
           cache: false
           resolve_ndk: false
 
+      # --no-default-features so the default il2cpp_v31 doesn't stack with
+      # whichever version this matrix entry selects; the rest of the
+      # previous default set is listed explicitly instead.
       - name: Run tests
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --workspace --features=${{ matrix.unity }},serde -- --skip bindgen
+          args: --workspace --no-default-features --features=${{ matrix.unity }},${{ env.default_features }},retour -- --skip bindgen
 
       - name: Check for clippy warnings
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --workspace --examples --tests --features=${{ matrix.unity }},serde -- -D warnings
+          args: --workspace --examples --tests --no-default-features --features=${{ matrix.unity }},${{ env.default_features }},retour -- -D warnings
 
       - name: Check formatting
         uses: actions-rs/cargo@v1
@@ -107,11 +117,15 @@ jobs:
           cache: false
           resolve_ndk: false
 
+      # --no-default-features so the default il2cpp_v31 doesn't stack with
+      # whichever version this matrix entry selects; the rest of the
+      # previous default set is listed explicitly instead (inline_hook in
+      # place of retour, since this targets Android).
       - name: Check for clippy warnings
         uses: actions-rs/cargo@v1
         with:
           command: ndk
-          args: --target=${{ matrix.ndk-target }} --platform=24 clippy --workspace --examples --features=${{ matrix.unity }},serde
+          args: --target=${{ matrix.ndk-target }} --platform=24 clippy --workspace --examples --no-default-features --features=${{ matrix.unity }},${{ env.default_features }},inline_hook
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
 

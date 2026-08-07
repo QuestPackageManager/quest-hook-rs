@@ -11,6 +11,8 @@ use crate::{
 
 #[cfg(feature = "il2cpp_v31")]
 type FieldInfoSlice<'a> = &'a [FieldInfo];
+#[cfg(feature = "il2cpp_v29")]
+type FieldInfoSlice<'a> = &'a [FieldInfo];
 #[cfg(feature = "il2cpp_v24")]
 type FieldInfoSlice<'a> = &'a [FieldInfo];
 #[cfg(feature = "unity2018")]
