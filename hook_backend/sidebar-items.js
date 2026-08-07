@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["UninstallError"],"struct":["FunctionHook","HookFilter","HookName","Priority"]};

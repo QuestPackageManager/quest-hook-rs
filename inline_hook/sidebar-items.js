@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":[["Hook","A function hook that works across most platforms"]]};
