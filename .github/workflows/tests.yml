@@ -33,7 +33,8 @@ jobs:
         with:
           workflow_token: ${{ secrets.GITHUB_TOKEN }}
           restore: false
-          cache: true
+          cache: false
+          resolve_ndk: false
 
       - name: Run tests
         uses: actions-rs/cargo@v1
