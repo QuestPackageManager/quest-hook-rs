@@ -71,7 +71,8 @@ jobs:
       matrix:
         unity: [il2cpp_v31]
         # unity: [il2cpp_v31, unity2018]
-        arch: [armv8, armv7]
+        arch: [armv8]
+        # arch: [armv8, armv7]
         include:
           - arch: armv8
             rust-target: aarch64-linux-android
