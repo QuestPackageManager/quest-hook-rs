@@ -615,6 +615,7 @@ pub struct FindMethodParameters {
 /// Possible errors when looking up a method
 #[derive(Debug, thiserror::Error, Clone, PartialEq, Eq, Hash)]
 pub enum FindMethodError {
+    /// No matching method was found
     #[error("no matching methods found for {0}")]
     None(FindMethodParameters),
 

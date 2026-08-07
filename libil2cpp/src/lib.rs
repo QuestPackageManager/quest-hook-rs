@@ -70,6 +70,7 @@
     rustdoc::private_intra_doc_links
 )]
 #![allow(clippy::single_component_path_imports)]
+#![allow(clippy::needless_continue)]
 
 //! Wrappers and raw bindings for Unity's libil2cpp
 

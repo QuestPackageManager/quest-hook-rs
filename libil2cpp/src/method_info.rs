@@ -64,7 +64,10 @@ impl MethodInfo {
         R: Returned,
     {
         match self.invoke_raw(this.invokable(), args.invokable().as_mut()) {
-            Ok(r) => Ok(R::from_object(transmute(r))),
+            Ok(r) => Ok(R::from_object(transmute::<
+                Option<&mut raw::Il2CppObject>,
+                Option<&mut Il2CppObject>,
+            >(r))),
             Err(e) => Err(Il2CppException::wrap_mut(e).into()),
         }
     }
@@ -188,7 +191,8 @@ impl fmt::Display for MethodInfo {
 }
 
 /// Object used for reflection of methods
-pub struct Il2CppReflectionMethod(raw::Il2CppReflectionMethod);
+#[repr(transparent)]
+pub struct Il2CppReflectionMethod(#[allow(dead_code)] raw::Il2CppReflectionMethod);
 
 impl Il2CppReflectionMethod {
     /// [`MethodInfo`] which this object represents

@@ -174,7 +174,8 @@ impl fmt::Display for Builtin {
 }
 
 /// Object used for reflection of types
-pub struct Il2CppReflectionType(raw::Il2CppReflectionType);
+#[repr(transparent)]
+pub struct Il2CppReflectionType(#[allow(dead_code)] raw::Il2CppReflectionType);
 
 unsafe impl WrapRaw for Il2CppReflectionType {
     type Raw = raw::Il2CppReflectionType;
