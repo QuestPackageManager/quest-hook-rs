@@ -61,7 +61,7 @@
 <a href=#61 id=61 data-nosnippet>61</a>        <span class="kw">unsafe </span>{ <span class="self">self</span>.raw().data.klassIndex == other.raw().data.klassIndex }
 <a href=#62 id=62 data-nosnippet>62</a>    }
 <a href=#63 id=63 data-nosnippet>63</a>
-<a href=#64 id=64 data-nosnippet>64</a>    <span class="attr">#[cfg(feature = <span class="string">"il2cpp_v31"</span>)]
+<a href=#64 id=64 data-nosnippet>64</a>    <span class="attr">#[cfg(any(feature = <span class="string">"il2cpp_v31"</span>, feature = <span class="string">"il2cpp_v29"</span>))]
 <a href=#65 id=65 data-nosnippet>65</a>    </span><span class="kw">fn </span>eq(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; bool {
 <a href=#66 id=66 data-nosnippet>66</a>        <span class="kw">unsafe </span>{ <span class="self">self</span>.raw().data.__klassIndex == other.raw().data.__klassIndex }
 <a href=#67 id=67 data-nosnippet>67</a>    }
@@ -92,146 +92,150 @@
 <a href=#92 id=92 data-nosnippet>92</a>        </span><span class="attr">#[doc = <span class="string">"Builtin C# types"</span>]
 <a href=#93 id=93 data-nosnippet>93</a>        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 <a href=#94 id=94 data-nosnippet>94</a>        #[cfg_attr(feature = <span class="string">"il2cpp_v31"</span>, repr(u32))]
-<a href=#95 id=95 data-nosnippet>95</a>        #[cfg_attr(feature = <span class="string">"il2cpp_v24"</span>, repr(u32))]
-<a href=#96 id=96 data-nosnippet>96</a>        #[cfg_attr(feature = <span class="string">"unity2018"</span>, repr(i32))]
-<a href=#97 id=97 data-nosnippet>97</a>        </span><span class="kw">pub enum </span>Builtin {
-<a href=#98 id=98 data-nosnippet>98</a>            $(
-<a href=#99 id=99 data-nosnippet>99</a>                <span class="attr">#[doc = <span class="macro">concat!</span>(<span class="string">"`"</span>, <span class="macro-nonterminal">$name</span>, <span class="string">"`"</span>)]
-<a href=#100 id=100 data-nosnippet>100</a>                </span><span class="macro-nonterminal">$variant </span>= <span class="macro-nonterminal">$const </span><span class="kw">as </span>u32,
-<a href=#101 id=101 data-nosnippet>101</a>            )*
-<a href=#102 id=102 data-nosnippet>102</a>        }
-<a href=#103 id=103 data-nosnippet>103</a>
-<a href=#104 id=104 data-nosnippet>104</a>        <span class="kw">impl </span>Il2CppType {
-<a href=#105 id=105 data-nosnippet>105</a>            <span class="attr">#[doc = <span class="string">"Whether the type represents the given [`Builtin`]"</span>]
-<a href=#106 id=106 data-nosnippet>106</a>            #[inline]
-<a href=#107 id=107 data-nosnippet>107</a>            </span><span class="kw">pub fn </span>is_builtin(<span class="kw-2">&amp;</span><span class="self">self</span>, builtin: Builtin) -&gt; bool {
-<a href=#108 id=108 data-nosnippet>108</a>                <span class="attr">#[cfg(feature = <span class="string">"il2cpp_v31"</span>)]
-<a href=#109 id=109 data-nosnippet>109</a>                </span>{ <span class="self">self</span>.raw().type_() == (builtin <span class="kw">as </span>u32).try_into().unwrap() }
-<a href=#110 id=110 data-nosnippet>110</a>
-<a href=#111 id=111 data-nosnippet>111</a>                <span class="attr">#[cfg(feature = <span class="string">"il2cpp_v24"</span>)]
-<a href=#112 id=112 data-nosnippet>112</a>                </span>{ <span class="self">self</span>.raw().type_() == builtin <span class="kw">as </span>u32 }
-<a href=#113 id=113 data-nosnippet>113</a>
-<a href=#114 id=114 data-nosnippet>114</a>                <span class="attr">#[cfg(feature = <span class="string">"unity2018"</span>)]
-<a href=#115 id=115 data-nosnippet>115</a>                </span>{ <span class="self">self</span>.raw().type_() == builtin <span class="kw">as </span>i32 }
-<a href=#116 id=116 data-nosnippet>116</a>            }
+<a href=#95 id=95 data-nosnippet>95</a>        #[cfg_attr(feature = <span class="string">"il2cpp_v29"</span>, repr(u32))]
+<a href=#96 id=96 data-nosnippet>96</a>        #[cfg_attr(feature = <span class="string">"il2cpp_v24"</span>, repr(u32))]
+<a href=#97 id=97 data-nosnippet>97</a>        #[cfg_attr(feature = <span class="string">"unity2018"</span>, repr(i32))]
+<a href=#98 id=98 data-nosnippet>98</a>        </span><span class="kw">pub enum </span>Builtin {
+<a href=#99 id=99 data-nosnippet>99</a>            $(
+<a href=#100 id=100 data-nosnippet>100</a>                <span class="attr">#[doc = <span class="macro">concat!</span>(<span class="string">"`"</span>, <span class="macro-nonterminal">$name</span>, <span class="string">"`"</span>)]
+<a href=#101 id=101 data-nosnippet>101</a>                </span><span class="macro-nonterminal">$variant </span>= <span class="macro-nonterminal">$const </span><span class="kw">as </span>u32,
+<a href=#102 id=102 data-nosnippet>102</a>            )*
+<a href=#103 id=103 data-nosnippet>103</a>        }
+<a href=#104 id=104 data-nosnippet>104</a>
+<a href=#105 id=105 data-nosnippet>105</a>        <span class="kw">impl </span>Il2CppType {
+<a href=#106 id=106 data-nosnippet>106</a>            <span class="attr">#[doc = <span class="string">"Whether the type represents the given [`Builtin`]"</span>]
+<a href=#107 id=107 data-nosnippet>107</a>            #[inline]
+<a href=#108 id=108 data-nosnippet>108</a>            </span><span class="kw">pub fn </span>is_builtin(<span class="kw-2">&amp;</span><span class="self">self</span>, builtin: Builtin) -&gt; bool {
+<a href=#109 id=109 data-nosnippet>109</a>                <span class="attr">#[cfg(feature = <span class="string">"il2cpp_v31"</span>)]
+<a href=#110 id=110 data-nosnippet>110</a>                </span>{ <span class="self">self</span>.raw().type_() == (builtin <span class="kw">as </span>u32).try_into().unwrap() }
+<a href=#111 id=111 data-nosnippet>111</a>
+<a href=#112 id=112 data-nosnippet>112</a>                <span class="attr">#[cfg(feature = <span class="string">"il2cpp_v29"</span>)]
+<a href=#113 id=113 data-nosnippet>113</a>                </span>{ <span class="self">self</span>.raw().type_() == (builtin <span class="kw">as </span>u32).try_into().unwrap() }
+<a href=#114 id=114 data-nosnippet>114</a>
+<a href=#115 id=115 data-nosnippet>115</a>                <span class="attr">#[cfg(feature = <span class="string">"il2cpp_v24"</span>)]
+<a href=#116 id=116 data-nosnippet>116</a>                </span>{ <span class="self">self</span>.raw().type_() == builtin <span class="kw">as </span>u32 }
 <a href=#117 id=117 data-nosnippet>117</a>
-<a href=#118 id=118 data-nosnippet>118</a>            <span class="macro">paste!</span> {
-<a href=#119 id=119 data-nosnippet>119</a>                $(
-<a href=#120 id=120 data-nosnippet>120</a>                    <span class="attr">#[doc = <span class="macro">concat!</span>(<span class="string">"Whether the type represents a `"</span>, <span class="macro-nonterminal">$name </span>, <span class="string">"`"</span>)]
-<a href=#121 id=121 data-nosnippet>121</a>                    </span><span class="kw">pub fn </span>[&lt;is_ <span class="macro-nonterminal">$id</span>&gt;](<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-<a href=#122 id=122 data-nosnippet>122</a>                        <span class="self">self</span>.is_builtin(Builtin::<span class="macro-nonterminal">$variant</span>)
-<a href=#123 id=123 data-nosnippet>123</a>                    }
-<a href=#124 id=124 data-nosnippet>124</a>                )*
-<a href=#125 id=125 data-nosnippet>125</a>            }
-<a href=#126 id=126 data-nosnippet>126</a>
-<a href=#127 id=127 data-nosnippet>127</a>            <span class="attr">#[doc = <span class="string">"[`Builtin`] the type represents, if any"</span>]
-<a href=#128 id=128 data-nosnippet>128</a>            </span><span class="kw">pub fn </span>as_builtin(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Builtin&gt; {
-<a href=#129 id=129 data-nosnippet>129</a>                <span class="attr">#[allow(non_upper_case_globals)]
-<a href=#130 id=130 data-nosnippet>130</a>                </span><span class="kw">match </span><span class="self">self</span>.raw().type_() {
-<a href=#131 id=131 data-nosnippet>131</a>                    $(<span class="macro-nonterminal">$const </span>=&gt; <span class="prelude-val">Some</span>(Builtin::<span class="macro-nonterminal">$variant</span>),)*
-<a href=#132 id=132 data-nosnippet>132</a>                    <span class="kw">_ </span>=&gt; <span class="prelude-val">None
-<a href=#133 id=133 data-nosnippet>133</a>                </span>}
-<a href=#134 id=134 data-nosnippet>134</a>            }
-<a href=#135 id=135 data-nosnippet>135</a>        }
-<a href=#136 id=136 data-nosnippet>136</a>
-<a href=#137 id=137 data-nosnippet>137</a>        <span class="kw">impl </span>Builtin {
-<a href=#138 id=138 data-nosnippet>138</a>            <span class="attr">#[doc = <span class="string">"Name of the builtin"</span>]
-<a href=#139 id=139 data-nosnippet>139</a>            </span><span class="kw">pub fn </span>name(<span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str {
-<a href=#140 id=140 data-nosnippet>140</a>                <span class="kw">match </span><span class="self">self </span>{
-<a href=#141 id=141 data-nosnippet>141</a>                    $(<span class="self">Self</span>::<span class="macro-nonterminal">$variant </span>=&gt; <span class="macro-nonterminal">$name</span>,)*
-<a href=#142 id=142 data-nosnippet>142</a>                }
-<a href=#143 id=143 data-nosnippet>143</a>            }
-<a href=#144 id=144 data-nosnippet>144</a>        }
-<a href=#145 id=145 data-nosnippet>145</a>    }
-<a href=#146 id=146 data-nosnippet>146</a>}
-<a href=#147 id=147 data-nosnippet>147</a>
-<a href=#148 id=148 data-nosnippet>148</a><span class="macro">builtins!</span> {
-<a href=#149 id=149 data-nosnippet>149</a>    Il2CppTypeEnum_IL2CPP_TYPE_VOID =&gt; (Void, void, <span class="string">"void"</span>),
-<a href=#150 id=150 data-nosnippet>150</a>    Il2CppTypeEnum_IL2CPP_TYPE_OBJECT =&gt; (Object, object, <span class="string">"object"</span>),
-<a href=#151 id=151 data-nosnippet>151</a>    Il2CppTypeEnum_IL2CPP_TYPE_BOOLEAN =&gt; (Bool, bool, <span class="string">"bool"</span>),
-<a href=#152 id=152 data-nosnippet>152</a>    Il2CppTypeEnum_IL2CPP_TYPE_CHAR =&gt; (Char, char, <span class="string">"char"</span>),
-<a href=#153 id=153 data-nosnippet>153</a>    Il2CppTypeEnum_IL2CPP_TYPE_U1 =&gt; (Byte, byte, <span class="string">"byte"</span>),
-<a href=#154 id=154 data-nosnippet>154</a>    Il2CppTypeEnum_IL2CPP_TYPE_I1 =&gt; (SByte, sbyte, <span class="string">"sbyte"</span>),
-<a href=#155 id=155 data-nosnippet>155</a>    Il2CppTypeEnum_IL2CPP_TYPE_I2 =&gt; (Short, short, <span class="string">"short"</span>),
-<a href=#156 id=156 data-nosnippet>156</a>    Il2CppTypeEnum_IL2CPP_TYPE_U2 =&gt; (UShort, ushort, <span class="string">"ushort"</span>),
-<a href=#157 id=157 data-nosnippet>157</a>    Il2CppTypeEnum_IL2CPP_TYPE_I4 =&gt; (Int, int, <span class="string">"int"</span>),
-<a href=#158 id=158 data-nosnippet>158</a>    Il2CppTypeEnum_IL2CPP_TYPE_U4 =&gt; (UInt, uint, <span class="string">"uint"</span>),
-<a href=#159 id=159 data-nosnippet>159</a>    Il2CppTypeEnum_IL2CPP_TYPE_I8 =&gt; (Long, long, <span class="string">"long"</span>),
-<a href=#160 id=160 data-nosnippet>160</a>    Il2CppTypeEnum_IL2CPP_TYPE_U8 =&gt; (ULong, ulong, <span class="string">"ulong"</span>),
-<a href=#161 id=161 data-nosnippet>161</a>    Il2CppTypeEnum_IL2CPP_TYPE_R4 =&gt; (Single, single, <span class="string">"single"</span>),
-<a href=#162 id=162 data-nosnippet>162</a>    Il2CppTypeEnum_IL2CPP_TYPE_R8 =&gt; (Double, double, <span class="string">"double"</span>),
-<a href=#163 id=163 data-nosnippet>163</a>    Il2CppTypeEnum_IL2CPP_TYPE_STRING =&gt; (String, string, <span class="string">"string"</span>),
-<a href=#164 id=164 data-nosnippet>164</a>}
-<a href=#165 id=165 data-nosnippet>165</a>
-<a href=#166 id=166 data-nosnippet>166</a><span class="kw">impl </span>fmt::Display <span class="kw">for </span>Builtin {
-<a href=#167 id=167 data-nosnippet>167</a>    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">'_</span>&gt;) -&gt; fmt::Result {
-<a href=#168 id=168 data-nosnippet>168</a>        f.write_str(<span class="self">self</span>.name())
-<a href=#169 id=169 data-nosnippet>169</a>    }
-<a href=#170 id=170 data-nosnippet>170</a>}
-<a href=#171 id=171 data-nosnippet>171</a>
-<a href=#172 id=172 data-nosnippet>172</a><span class="doccomment">/// Object used for reflection of types
-<a href=#173 id=173 data-nosnippet>173</a></span><span class="kw">pub struct </span>Il2CppReflectionType(raw::Il2CppReflectionType);
-<a href=#174 id=174 data-nosnippet>174</a>
-<a href=#175 id=175 data-nosnippet>175</a><span class="kw">unsafe impl </span>WrapRaw <span class="kw">for </span>Il2CppReflectionType {
-<a href=#176 id=176 data-nosnippet>176</a>    <span class="kw">type </span>Raw = raw::Il2CppReflectionType;
-<a href=#177 id=177 data-nosnippet>177</a>}
+<a href=#118 id=118 data-nosnippet>118</a>                <span class="attr">#[cfg(feature = <span class="string">"unity2018"</span>)]
+<a href=#119 id=119 data-nosnippet>119</a>                </span>{ <span class="self">self</span>.raw().type_() == builtin <span class="kw">as </span>i32 }
+<a href=#120 id=120 data-nosnippet>120</a>            }
+<a href=#121 id=121 data-nosnippet>121</a>
+<a href=#122 id=122 data-nosnippet>122</a>            <span class="macro">paste!</span> {
+<a href=#123 id=123 data-nosnippet>123</a>                $(
+<a href=#124 id=124 data-nosnippet>124</a>                    <span class="attr">#[doc = <span class="macro">concat!</span>(<span class="string">"Whether the type represents a `"</span>, <span class="macro-nonterminal">$name </span>, <span class="string">"`"</span>)]
+<a href=#125 id=125 data-nosnippet>125</a>                    </span><span class="kw">pub fn </span>[&lt;is_ <span class="macro-nonterminal">$id</span>&gt;](<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#126 id=126 data-nosnippet>126</a>                        <span class="self">self</span>.is_builtin(Builtin::<span class="macro-nonterminal">$variant</span>)
+<a href=#127 id=127 data-nosnippet>127</a>                    }
+<a href=#128 id=128 data-nosnippet>128</a>                )*
+<a href=#129 id=129 data-nosnippet>129</a>            }
+<a href=#130 id=130 data-nosnippet>130</a>
+<a href=#131 id=131 data-nosnippet>131</a>            <span class="attr">#[doc = <span class="string">"[`Builtin`] the type represents, if any"</span>]
+<a href=#132 id=132 data-nosnippet>132</a>            </span><span class="kw">pub fn </span>as_builtin(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Builtin&gt; {
+<a href=#133 id=133 data-nosnippet>133</a>                <span class="attr">#[allow(non_upper_case_globals)]
+<a href=#134 id=134 data-nosnippet>134</a>                </span><span class="kw">match </span><span class="self">self</span>.raw().type_() {
+<a href=#135 id=135 data-nosnippet>135</a>                    $(<span class="macro-nonterminal">$const </span>=&gt; <span class="prelude-val">Some</span>(Builtin::<span class="macro-nonterminal">$variant</span>),)*
+<a href=#136 id=136 data-nosnippet>136</a>                    <span class="kw">_ </span>=&gt; <span class="prelude-val">None
+<a href=#137 id=137 data-nosnippet>137</a>                </span>}
+<a href=#138 id=138 data-nosnippet>138</a>            }
+<a href=#139 id=139 data-nosnippet>139</a>        }
+<a href=#140 id=140 data-nosnippet>140</a>
+<a href=#141 id=141 data-nosnippet>141</a>        <span class="kw">impl </span>Builtin {
+<a href=#142 id=142 data-nosnippet>142</a>            <span class="attr">#[doc = <span class="string">"Name of the builtin"</span>]
+<a href=#143 id=143 data-nosnippet>143</a>            </span><span class="kw">pub fn </span>name(<span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str {
+<a href=#144 id=144 data-nosnippet>144</a>                <span class="kw">match </span><span class="self">self </span>{
+<a href=#145 id=145 data-nosnippet>145</a>                    $(<span class="self">Self</span>::<span class="macro-nonterminal">$variant </span>=&gt; <span class="macro-nonterminal">$name</span>,)*
+<a href=#146 id=146 data-nosnippet>146</a>                }
+<a href=#147 id=147 data-nosnippet>147</a>            }
+<a href=#148 id=148 data-nosnippet>148</a>        }
+<a href=#149 id=149 data-nosnippet>149</a>    }
+<a href=#150 id=150 data-nosnippet>150</a>}
+<a href=#151 id=151 data-nosnippet>151</a>
+<a href=#152 id=152 data-nosnippet>152</a><span class="macro">builtins!</span> {
+<a href=#153 id=153 data-nosnippet>153</a>    Il2CppTypeEnum_IL2CPP_TYPE_VOID =&gt; (Void, void, <span class="string">"void"</span>),
+<a href=#154 id=154 data-nosnippet>154</a>    Il2CppTypeEnum_IL2CPP_TYPE_OBJECT =&gt; (Object, object, <span class="string">"object"</span>),
+<a href=#155 id=155 data-nosnippet>155</a>    Il2CppTypeEnum_IL2CPP_TYPE_BOOLEAN =&gt; (Bool, bool, <span class="string">"bool"</span>),
+<a href=#156 id=156 data-nosnippet>156</a>    Il2CppTypeEnum_IL2CPP_TYPE_CHAR =&gt; (Char, char, <span class="string">"char"</span>),
+<a href=#157 id=157 data-nosnippet>157</a>    Il2CppTypeEnum_IL2CPP_TYPE_U1 =&gt; (Byte, byte, <span class="string">"byte"</span>),
+<a href=#158 id=158 data-nosnippet>158</a>    Il2CppTypeEnum_IL2CPP_TYPE_I1 =&gt; (SByte, sbyte, <span class="string">"sbyte"</span>),
+<a href=#159 id=159 data-nosnippet>159</a>    Il2CppTypeEnum_IL2CPP_TYPE_I2 =&gt; (Short, short, <span class="string">"short"</span>),
+<a href=#160 id=160 data-nosnippet>160</a>    Il2CppTypeEnum_IL2CPP_TYPE_U2 =&gt; (UShort, ushort, <span class="string">"ushort"</span>),
+<a href=#161 id=161 data-nosnippet>161</a>    Il2CppTypeEnum_IL2CPP_TYPE_I4 =&gt; (Int, int, <span class="string">"int"</span>),
+<a href=#162 id=162 data-nosnippet>162</a>    Il2CppTypeEnum_IL2CPP_TYPE_U4 =&gt; (UInt, uint, <span class="string">"uint"</span>),
+<a href=#163 id=163 data-nosnippet>163</a>    Il2CppTypeEnum_IL2CPP_TYPE_I8 =&gt; (Long, long, <span class="string">"long"</span>),
+<a href=#164 id=164 data-nosnippet>164</a>    Il2CppTypeEnum_IL2CPP_TYPE_U8 =&gt; (ULong, ulong, <span class="string">"ulong"</span>),
+<a href=#165 id=165 data-nosnippet>165</a>    Il2CppTypeEnum_IL2CPP_TYPE_R4 =&gt; (Single, single, <span class="string">"single"</span>),
+<a href=#166 id=166 data-nosnippet>166</a>    Il2CppTypeEnum_IL2CPP_TYPE_R8 =&gt; (Double, double, <span class="string">"double"</span>),
+<a href=#167 id=167 data-nosnippet>167</a>    Il2CppTypeEnum_IL2CPP_TYPE_STRING =&gt; (String, string, <span class="string">"string"</span>),
+<a href=#168 id=168 data-nosnippet>168</a>}
+<a href=#169 id=169 data-nosnippet>169</a>
+<a href=#170 id=170 data-nosnippet>170</a><span class="kw">impl </span>fmt::Display <span class="kw">for </span>Builtin {
+<a href=#171 id=171 data-nosnippet>171</a>    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">'_</span>&gt;) -&gt; fmt::Result {
+<a href=#172 id=172 data-nosnippet>172</a>        f.write_str(<span class="self">self</span>.name())
+<a href=#173 id=173 data-nosnippet>173</a>    }
+<a href=#174 id=174 data-nosnippet>174</a>}
+<a href=#175 id=175 data-nosnippet>175</a>
+<a href=#176 id=176 data-nosnippet>176</a><span class="doccomment">/// Object used for reflection of types
+<a href=#177 id=177 data-nosnippet>177</a></span><span class="kw">pub struct </span>Il2CppReflectionType(raw::Il2CppReflectionType);
 <a href=#178 id=178 data-nosnippet>178</a>
-<a href=#179 id=179 data-nosnippet>179</a><span class="kw">impl </span>Il2CppReflectionType {
-<a href=#180 id=180 data-nosnippet>180</a>    <span class="doccomment">/// [`Il2CppType`] which this object represents
-<a href=#181 id=181 data-nosnippet>181</a>    </span><span class="kw">pub fn </span>ty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Il2CppType {
-<a href=#182 id=182 data-nosnippet>182</a>        <span class="kw">unsafe </span>{ Il2CppType::wrap(<span class="kw-2">&amp;*</span><span class="self">self</span>.raw().type_) }
-<a href=#183 id=183 data-nosnippet>183</a>    }
-<a href=#184 id=184 data-nosnippet>184</a>
-<a href=#185 id=185 data-nosnippet>185</a>    <span class="doccomment">/// Instanciates a generic type template with the provided generic
-<a href=#186 id=186 data-nosnippet>186</a>    /// arguments
-<a href=#187 id=187 data-nosnippet>187</a>    </span><span class="kw">pub fn </span>make_generic&lt;G&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="self">Self</span>&gt;, Gc&lt;Il2CppException&gt;&gt;
-<a href=#188 id=188 data-nosnippet>188</a>    <span class="kw">where
-<a href=#189 id=189 data-nosnippet>189</a>        </span>G: Generics,
-<a href=#190 id=190 data-nosnippet>190</a>    {
-<a href=#191 id=191 data-nosnippet>191</a>        <span class="kw">let </span>generics = G::type_array();
-<a href=#192 id=192 data-nosnippet>192</a>        <span class="kw">let </span>make_generic = <span class="self">self
-<a href=#193 id=193 data-nosnippet>193</a>            </span>.class()
-<a href=#194 id=194 data-nosnippet>194</a>            .find_method_unchecked(<span class="string">"MakeGenericType"</span>, <span class="number">2</span>)
-<a href=#195 id=195 data-nosnippet>195</a>            .unwrap();
-<a href=#196 id=196 data-nosnippet>196</a>        <span class="kw">let </span>ret = <span class="kw">unsafe </span>{
-<a href=#197 id=197 data-nosnippet>197</a>            make_generic.invoke_raw(
-<a href=#198 id=198 data-nosnippet>198</a>                null_mut(),
-<a href=#199 id=199 data-nosnippet>199</a>                [
-<a href=#200 id=200 data-nosnippet>200</a>                    <span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span><span class="self">Self </span><span class="kw">as </span><span class="kw-2">*mut </span>c_void,
-<a href=#201 id=201 data-nosnippet>201</a>                    (generics <span class="kw">as </span><span class="kw-2">*mut </span>raw::Il2CppArray).cast(),
-<a href=#202 id=202 data-nosnippet>202</a>                ]
-<a href=#203 id=203 data-nosnippet>203</a>                .as_mut(),
-<a href=#204 id=204 data-nosnippet>204</a>            )
-<a href=#205 id=205 data-nosnippet>205</a>        };
-<a href=#206 id=206 data-nosnippet>206</a>        <span class="kw">let </span>obj = <span class="kw">match </span>ret {
-<a href=#207 id=207 data-nosnippet>207</a>            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(obj)) =&gt; obj,
-<a href=#208 id=208 data-nosnippet>208</a>            <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) =&gt; <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>),
-<a href=#209 id=209 data-nosnippet>209</a>            <span class="prelude-val">Err</span>(e) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="kw">unsafe </span>{ Gc::from(Il2CppException::wrap_mut(e)) }),
-<a href=#210 id=210 data-nosnippet>210</a>        };
-<a href=#211 id=211 data-nosnippet>211</a>        <span class="kw">let </span>ty = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(obj <span class="kw">as </span><span class="kw-2">*mut </span>raw::Il2CppObject).cast() };
-<a href=#212 id=212 data-nosnippet>212</a>        <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(ty))
-<a href=#213 id=213 data-nosnippet>213</a>    }
-<a href=#214 id=214 data-nosnippet>214</a>}
-<a href=#215 id=215 data-nosnippet>215</a>
-<a href=#216 id=216 data-nosnippet>216</a><span class="kw">impl </span>Deref <span class="kw">for </span>Il2CppReflectionType {
-<a href=#217 id=217 data-nosnippet>217</a>    <span class="kw">type </span>Target = Il2CppObject;
-<a href=#218 id=218 data-nosnippet>218</a>
-<a href=#219 id=219 data-nosnippet>219</a>    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
-<a href=#220 id=220 data-nosnippet>220</a>        <span class="kw">unsafe </span>{ Il2CppObject::wrap(<span class="kw-2">&amp;</span><span class="self">self</span>.raw().object) }
-<a href=#221 id=221 data-nosnippet>221</a>    }
-<a href=#222 id=222 data-nosnippet>222</a>}
-<a href=#223 id=223 data-nosnippet>223</a>
-<a href=#224 id=224 data-nosnippet>224</a><span class="kw">impl </span>DerefMut <span class="kw">for </span>Il2CppReflectionType {
-<a href=#225 id=225 data-nosnippet>225</a>    <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self</span>::Target {
-<a href=#226 id=226 data-nosnippet>226</a>        <span class="kw">unsafe </span>{ Il2CppObject::wrap_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>.raw_mut().object) }
-<a href=#227 id=227 data-nosnippet>227</a>    }
-<a href=#228 id=228 data-nosnippet>228</a>}
-<a href=#229 id=229 data-nosnippet>229</a>
-<a href=#230 id=230 data-nosnippet>230</a><span class="kw">impl </span>fmt::Debug <span class="kw">for </span>Il2CppReflectionType {
-<a href=#231 id=231 data-nosnippet>231</a>    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">'_</span>&gt;) -&gt; fmt::Result {
-<a href=#232 id=232 data-nosnippet>232</a>        f.debug_struct(<span class="string">"Il2CppReflectionType"</span>)
-<a href=#233 id=233 data-nosnippet>233</a>            .field(<span class="string">"ty"</span>, <span class="self">self</span>.ty())
-<a href=#234 id=234 data-nosnippet>234</a>            .finish()
-<a href=#235 id=235 data-nosnippet>235</a>    }
-<a href=#236 id=236 data-nosnippet>236</a>}
+<a href=#179 id=179 data-nosnippet>179</a><span class="kw">unsafe impl </span>WrapRaw <span class="kw">for </span>Il2CppReflectionType {
+<a href=#180 id=180 data-nosnippet>180</a>    <span class="kw">type </span>Raw = raw::Il2CppReflectionType;
+<a href=#181 id=181 data-nosnippet>181</a>}
+<a href=#182 id=182 data-nosnippet>182</a>
+<a href=#183 id=183 data-nosnippet>183</a><span class="kw">impl </span>Il2CppReflectionType {
+<a href=#184 id=184 data-nosnippet>184</a>    <span class="doccomment">/// [`Il2CppType`] which this object represents
+<a href=#185 id=185 data-nosnippet>185</a>    </span><span class="kw">pub fn </span>ty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Il2CppType {
+<a href=#186 id=186 data-nosnippet>186</a>        <span class="kw">unsafe </span>{ Il2CppType::wrap(<span class="kw-2">&amp;*</span><span class="self">self</span>.raw().type_) }
+<a href=#187 id=187 data-nosnippet>187</a>    }
+<a href=#188 id=188 data-nosnippet>188</a>
+<a href=#189 id=189 data-nosnippet>189</a>    <span class="doccomment">/// Instanciates a generic type template with the provided generic
+<a href=#190 id=190 data-nosnippet>190</a>    /// arguments
+<a href=#191 id=191 data-nosnippet>191</a>    </span><span class="kw">pub fn </span>make_generic&lt;G&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="self">Self</span>&gt;, Gc&lt;Il2CppException&gt;&gt;
+<a href=#192 id=192 data-nosnippet>192</a>    <span class="kw">where
+<a href=#193 id=193 data-nosnippet>193</a>        </span>G: Generics,
+<a href=#194 id=194 data-nosnippet>194</a>    {
+<a href=#195 id=195 data-nosnippet>195</a>        <span class="kw">let </span>generics = G::type_array();
+<a href=#196 id=196 data-nosnippet>196</a>        <span class="kw">let </span>make_generic = <span class="self">self
+<a href=#197 id=197 data-nosnippet>197</a>            </span>.class()
+<a href=#198 id=198 data-nosnippet>198</a>            .find_method_unchecked(<span class="string">"MakeGenericType"</span>, <span class="number">2</span>)
+<a href=#199 id=199 data-nosnippet>199</a>            .unwrap();
+<a href=#200 id=200 data-nosnippet>200</a>        <span class="kw">let </span>ret = <span class="kw">unsafe </span>{
+<a href=#201 id=201 data-nosnippet>201</a>            make_generic.invoke_raw(
+<a href=#202 id=202 data-nosnippet>202</a>                null_mut(),
+<a href=#203 id=203 data-nosnippet>203</a>                [
+<a href=#204 id=204 data-nosnippet>204</a>                    <span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span><span class="self">Self </span><span class="kw">as </span><span class="kw-2">*mut </span>c_void,
+<a href=#205 id=205 data-nosnippet>205</a>                    (generics <span class="kw">as </span><span class="kw-2">*mut </span>raw::Il2CppArray).cast(),
+<a href=#206 id=206 data-nosnippet>206</a>                ]
+<a href=#207 id=207 data-nosnippet>207</a>                .as_mut(),
+<a href=#208 id=208 data-nosnippet>208</a>            )
+<a href=#209 id=209 data-nosnippet>209</a>        };
+<a href=#210 id=210 data-nosnippet>210</a>        <span class="kw">let </span>obj = <span class="kw">match </span>ret {
+<a href=#211 id=211 data-nosnippet>211</a>            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(obj)) =&gt; obj,
+<a href=#212 id=212 data-nosnippet>212</a>            <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) =&gt; <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>),
+<a href=#213 id=213 data-nosnippet>213</a>            <span class="prelude-val">Err</span>(e) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="kw">unsafe </span>{ Gc::from(Il2CppException::wrap_mut(e)) }),
+<a href=#214 id=214 data-nosnippet>214</a>        };
+<a href=#215 id=215 data-nosnippet>215</a>        <span class="kw">let </span>ty = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(obj <span class="kw">as </span><span class="kw-2">*mut </span>raw::Il2CppObject).cast() };
+<a href=#216 id=216 data-nosnippet>216</a>        <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(ty))
+<a href=#217 id=217 data-nosnippet>217</a>    }
+<a href=#218 id=218 data-nosnippet>218</a>}
+<a href=#219 id=219 data-nosnippet>219</a>
+<a href=#220 id=220 data-nosnippet>220</a><span class="kw">impl </span>Deref <span class="kw">for </span>Il2CppReflectionType {
+<a href=#221 id=221 data-nosnippet>221</a>    <span class="kw">type </span>Target = Il2CppObject;
+<a href=#222 id=222 data-nosnippet>222</a>
+<a href=#223 id=223 data-nosnippet>223</a>    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
+<a href=#224 id=224 data-nosnippet>224</a>        <span class="kw">unsafe </span>{ Il2CppObject::wrap(<span class="kw-2">&amp;</span><span class="self">self</span>.raw().object) }
+<a href=#225 id=225 data-nosnippet>225</a>    }
+<a href=#226 id=226 data-nosnippet>226</a>}
+<a href=#227 id=227 data-nosnippet>227</a>
+<a href=#228 id=228 data-nosnippet>228</a><span class="kw">impl </span>DerefMut <span class="kw">for </span>Il2CppReflectionType {
+<a href=#229 id=229 data-nosnippet>229</a>    <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self</span>::Target {
+<a href=#230 id=230 data-nosnippet>230</a>        <span class="kw">unsafe </span>{ Il2CppObject::wrap_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>.raw_mut().object) }
+<a href=#231 id=231 data-nosnippet>231</a>    }
+<a href=#232 id=232 data-nosnippet>232</a>}
+<a href=#233 id=233 data-nosnippet>233</a>
+<a href=#234 id=234 data-nosnippet>234</a><span class="kw">impl </span>fmt::Debug <span class="kw">for </span>Il2CppReflectionType {
+<a href=#235 id=235 data-nosnippet>235</a>    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">'_</span>&gt;) -&gt; fmt::Result {
+<a href=#236 id=236 data-nosnippet>236</a>        f.debug_struct(<span class="string">"Il2CppReflectionType"</span>)
+<a href=#237 id=237 data-nosnippet>237</a>            .field(<span class="string">"ty"</span>, <span class="self">self</span>.ty())
+<a href=#238 id=238 data-nosnippet>238</a>            .finish()
+<a href=#239 id=239 data-nosnippet>239</a>    }
+<a href=#240 id=240 data-nosnippet>240</a>}
 </code></pre></div></section></main></body></html>
