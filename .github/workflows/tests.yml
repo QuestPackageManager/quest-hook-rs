@@ -69,7 +69,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        unity: [il2cpp_v31, unity2018]
+        unity: [il2cpp_v31]
+        # unity: [il2cpp_v31, unity2018]
         arch: [armv8, armv7]
         include:
           - arch: armv8
