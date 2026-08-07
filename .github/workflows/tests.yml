@@ -26,6 +26,15 @@ jobs:
             target/
           key: tests-${{ matrix.os }}-${{ matrix.unity }}-${{ hashFiles('**/Cargo.toml') }}
 
+      # Building with default features (bindgen) shells out to qpm in
+      # libil2cpp's build.rs
+      - name: Setup qpm
+        uses: Fernthedev/qpm-action@v1
+        with:
+          workflow_token: ${{ secrets.GITHUB_TOKEN }}
+          restore: false
+          cache: true
+
       - name: Run tests
         uses: actions-rs/cargo@v1
         with:
@@ -49,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        unity: [unity2019, unity2018]
+        unity: [il2cpp_v31, unity2018]
         arch: [armv8, armv7]
         include:
           - arch: armv8
@@ -86,6 +95,15 @@ jobs:
         with:
           command: install
           args: cargo-ndk
+
+      # Building with default features (bindgen) shells out to qpm in
+      # libil2cpp's build.rs
+      - name: Setup qpm
+        uses: Fernthedev/qpm-action@v1
+        with:
+          workflow_token: ${{ secrets.GITHUB_TOKEN }}
+          restore: false
+          cache: true
 
       - name: Check for clippy warnings
         uses: actions-rs/cargo@v1

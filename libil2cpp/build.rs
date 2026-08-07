@@ -10,6 +10,8 @@ fn main() {
 fn run_bindgen() {
     use std::process::Command;
 
+    use quest_build_helper::qpm;
+
     #[cfg(feature = "il2cpp_v29")]
     let version = "0.2.0";
 
@@ -28,18 +30,13 @@ fn run_bindgen() {
     );
 
     // qpm dependency add libil2cpp --version {version}
-    Command::new("qpm")
+    Command::new(qpm::qpm_bin())
         .args(["dependency", "add", "libil2cpp", "--version", version])
         .current_dir(&manifest)
         .status()
         .expect("Failed to add qpm dependency");
 
-    // qpm restore
-    Command::new("qpm")
-        .args(["restore"])
-        .current_dir(&manifest)
-        .status()
-        .expect("Failed to restore qpm dependencies");
+    qpm::restore(&manifest, false).expect("Failed to restore qpm dependencies");
 
     println!("cargo:rerun-if-changed=wrapper.h");
     let bindings = bindgen::Builder::default()

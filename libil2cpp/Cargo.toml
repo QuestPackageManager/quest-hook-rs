@@ -29,9 +29,10 @@ il2cpp_v29 = []
 il2cpp_v24 = []
 unity2018 = []
 # whether to use bindgen to generate bindings at build time
-bindgen = ["dep:bindgen"]
+bindgen = ["dep:bindgen", "dep:quest_build_helper"]
 cache = []
 trace = ["tracing"]
 
 [build-dependencies]
 bindgen = { version = "0.72", optional = true }
+quest_build_helper = { path = "../quest_build_helper", optional = true }

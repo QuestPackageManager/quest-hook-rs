@@ -25,11 +25,20 @@ jobs:
             target/
           key: docs-${{ hashFiles('**/Cargo.toml') }}
 
+      # Building with default features (bindgen) shells out to qpm in
+      # libil2cpp's build.rs
+      - name: Setup qpm
+        uses: Fernthedev/qpm-action@v1
+        with:
+          workflow_token: ${{ secrets.GITHUB_TOKEN }}
+          restore: false
+          cache: true
+
       - name: Generate docs
         uses: actions-rs/cargo@v1
         with:
           command: doc
-          args: --workspace --no-deps --features=unity2019,serde
+          args: --workspace --no-deps --features=il2cpp_v31,serde
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
