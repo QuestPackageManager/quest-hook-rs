@@ -79,6 +79,71 @@
 
 use cfg_if::cfg_if;
 
+/// Identifies a hook by name and namespace.
+///
+/// Passed to `Hook::install` so that other hooks targeting the same address
+/// can order themselves relative to it via [`Priority`].
+#[derive(Debug, Clone, Copy)]
+pub struct HookName {
+    /// The namespace the hook was declared under.
+    pub namespace: &'static str,
+    /// The hook's own name.
+    pub name: &'static str,
+}
+
+/// Selects one or more hooks by name, namespace, or both, for use in
+/// [`Priority`]'s `before`/`after` lists. A `None` field matches any value,
+/// so a filter can narrow by either field alone or by both together.
+#[derive(Debug, Clone, Copy)]
+pub struct HookFilter {
+    /// Namespace to match, or `None` to match any namespace.
+    pub namespace: Option<&'static str>,
+    /// Name to match, or `None` to match any name.
+    pub name: Option<&'static str>,
+}
+
+/// Where to install a hook relative to other hooks already installed on the
+/// same target.
+///
+/// Only meaningfully enforced by backends that support multiple hooks per
+/// target (currently `flamingo`); other backends accept and ignore it, as
+/// they only ever support a single hook per target. Both fields may be
+/// non-empty at once: a hook can be constrained to install closer to the
+/// target than some hooks and farther than others simultaneously.
+#[derive(Debug, Clone, Default)]
+pub struct Priority {
+    /// Installs closer to the target than every hook matching one of these
+    /// filters.
+    pub before: Vec<HookFilter>,
+    /// Installs farther from the target than every hook matching one of
+    /// these filters.
+    pub after: Vec<HookFilter>,
+}
+
+/// Why `Hook::uninstall` failed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UninstallError {
+    /// The hook was never installed, or was already uninstalled.
+    NotInstalled,
+    /// The active backend cannot uninstall hooks at all; only `flamingo`
+    /// currently supports it.
+    Unsupported,
+    /// The native library failed to remove the hook.
+    Failed,
+}
+
+impl std::fmt::Display for UninstallError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::NotInstalled => "hook was not installed",
+            Self::Unsupported => "active backend does not support uninstalling hooks",
+            Self::Failed => "native library failed to remove the hook",
+        })
+    }
+}
+
+impl std::error::Error for UninstallError {}
+
 #[cfg(all(
     target_arch = "aarch64",
     target_os = "android",
@@ -113,11 +178,15 @@ cfg_if! {
 mod tests {
     use std::mem::transmute;
 
-    use super::Hook;
+    use super::{Hook, HookName, Priority, UninstallError};
 
     #[test]
     fn target_and_original() {
         static HOOK: Hook = Hook::new();
+        const NAME: HookName = HookName {
+            namespace: "hook_backend",
+            name: "target_and_original",
+        };
 
         #[inline(never)]
         fn add(n1: usize, n2: usize) -> usize {
@@ -132,12 +201,57 @@ mod tests {
         assert_eq!(add(2, 3), 5);
         assert_eq!(mul(2, 3), 6);
 
-        assert!(unsafe { HOOK.install(add as _, mul as _) } && HOOK.is_installed());
+        assert!(
+            unsafe { HOOK.install(add as _, mul as _, NAME, Priority::default()) }
+                && HOOK.is_installed()
+        );
 
         assert_eq!(add(2, 3), mul(2, 3));
 
         let original =
             unsafe { transmute::<*const (), fn(usize, usize) -> usize>(HOOK.original().unwrap()) };
         assert_eq!(original(2, 3), 5);
+    }
+
+    #[test]
+    fn uninstall_restores_the_original_and_can_only_run_once() {
+        static HOOK: Hook = Hook::new();
+        const NAME: HookName = HookName {
+            namespace: "hook_backend",
+            name: "uninstall_restores_the_original_and_can_only_run_once",
+        };
+
+        #[inline(never)]
+        fn sub(n1: usize, n2: usize) -> usize {
+            n1 - n2
+        }
+
+        #[inline(never)]
+        fn double(n1: usize, _n2: usize) -> usize {
+            n1 * 2
+        }
+
+        assert!(unsafe { HOOK.install(sub as _, double as _, NAME, Priority::default()) });
+        assert!(HOOK.is_installed());
+        assert_eq!(sub(5, 1), double(5, 1));
+
+        assert_eq!(unsafe { HOOK.uninstall() }, Ok(()));
+        assert!(!HOOK.is_installed());
+        assert_eq!(sub(5, 1), 4);
+
+        assert_eq!(
+            unsafe { HOOK.uninstall() },
+            Err(UninstallError::NotInstalled)
+        );
+    }
+
+    #[test]
+    fn uninstall_without_install_fails() {
+        static HOOK: Hook = Hook::new();
+
+        assert_eq!(
+            unsafe { HOOK.uninstall() },
+            Err(UninstallError::NotInstalled)
+        );
     }
 }

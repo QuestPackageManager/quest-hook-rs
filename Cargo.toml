@@ -55,3 +55,7 @@ required-features = ["util"]
 name = "custom_type"
 crate-type = ["cdylib"]
 required-features = ["util"]
+[[example]]
+name = "hook_priority"
+crate-type = ["cdylib"]
+required-features = ["util", "flamingo"]
