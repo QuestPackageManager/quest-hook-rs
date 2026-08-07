@@ -113,14 +113,87 @@ pub unsafe fn unbox<T>(object: &Il2CppObject) -> T {
 ///
 /// `Object::Box` (the underlying il2cpp function) allocates memory for the
 /// boxed object, so the returned pointer is managed by the il2cpp GC
+/// TODO: Return `Gc<Il2CppObject>`
 #[inline]
-pub unsafe fn value_box<T: Type>(this: &mut T) -> *mut T {
+pub unsafe fn value_box_alloc<T: Type>(this: &T) -> *mut Il2CppObject {
     // TODO: WrapRaw for T?
-    let boxed = functions::value_box(
+    functions::value_box(
         T::class().raw() as *const Il2CppClass as *mut Il2CppClass,
-        (this as *mut T).cast::<c_void>(),
+        (this as *const T).cast::<c_void>(),
     )
-    .cast::<T>();
+}
 
-    boxed
+/// Boxes a value type into an [`Il2CppObject`] without allocating or copying,
+/// mirroring beatsaber-hook's `to_object<Box = true>(fake_box = true)`
+///
+/// Rather than calling `Object::Box`, this pretends an [`Il2CppObject`]
+/// header sits right before `this`, offsetting its address back by the
+/// header's size. Unboxing the result (which adds the header size back)
+/// yields `this` again, but the header itself is never written, so the
+/// returned pointer must never be read as a real object (e.g. its class) -
+/// only unboxed back into `T`. It is only valid for as long as `this` is.
+///
+/// # Safety
+/// The provided value must be a valid value of the given type.
+#[inline]
+pub unsafe fn fake_value_box<T: Type>(this: &T) -> *mut Il2CppObject {
+    // https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/types.hpp#L227-L228
+    // Real boxing by necessity copies the struct into the boxed object, in addition
+    // to having higher overhead, so modifications would have to be copied back
+    // to the original object
+    let address = this as *const T as usize;
+    (address - size_of::<Il2CppObject>()) as *mut Il2CppObject
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `unbox` must read from `size_of::<Il2CppObject>()` bytes past the
+    /// object pointer, not from the pointer itself.
+    #[test]
+    fn unbox_reads_the_value_placed_after_the_header() {
+        #[repr(align(16))]
+        struct Buf([u8; 64]);
+
+        let mut buf = Buf([0; 64]);
+        let value: u32 = 0xCAFE_F00D;
+
+        unsafe {
+            let value_ptr = buf.0.as_mut_ptr().add(size_of::<Il2CppObject>()).cast::<u32>();
+            value_ptr.write_unaligned(value);
+
+            let object = &*buf.0.as_ptr().cast::<Il2CppObject>();
+            let unboxed: u32 = unbox(object);
+            assert_eq!(unboxed, value);
+        }
+    }
+
+    /// `fake_value_box` must not allocate: the pointer it returns is `this`'s
+    /// own address, shifted back by exactly one header's worth of bytes.
+    #[test]
+    fn fake_value_box_offsets_the_address_back_by_the_header_size() {
+        let value: u64 = 42;
+
+        unsafe {
+            let object = fake_value_box(&value);
+            let object_addr = object as usize;
+            let value_addr = &value as *const u64 as usize;
+            assert_eq!(object_addr + size_of::<Il2CppObject>(), value_addr);
+        }
+    }
+
+    /// Boxing a value with `fake_value_box` and reading it back with `unbox`
+    /// must reproduce the original value, since the two apply opposite
+    /// offsets of the same size.
+    #[test]
+    fn fake_value_box_round_trips_through_unbox() {
+        let value: u64 = 0xDEAD_BEEF_CAFE_F00D;
+
+        unsafe {
+            let object = fake_value_box(&value);
+            let unboxed: u64 = unbox(&*object);
+            assert_eq!(unboxed, value);
+        }
+    }
 }
