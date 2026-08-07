@@ -24,7 +24,7 @@
 <a href=#24 id=24 data-nosnippet>24</a>    mem::{size_of, transmute},
 <a href=#25 id=25 data-nosnippet>25</a>};
 <a href=#26 id=26 data-nosnippet>26</a>
-<a href=#27 id=27 data-nosnippet>27</a><span class="kw">use </span><span class="kw">crate</span>::Type;
+<a href=#27 id=27 data-nosnippet>27</a><span class="kw">use </span><span class="kw">crate</span>::ValueType;
 <a href=#28 id=28 data-nosnippet>28</a>
 <a href=#29 id=29 data-nosnippet>29</a><span class="doccomment">/// Safe wrapper around a raw il2cpp type which can be used in its place
 <a href=#30 id=30 data-nosnippet>30</a>///
@@ -101,7 +101,7 @@
 <a href=#101 id=101 data-nosnippet>101</a>/// `Object::Unbox` (the underlying il2cpp function) does not allocate memory,
 <a href=#102 id=102 data-nosnippet>102</a>/// so the returned value is a copy of the value stored in the object.
 <a href=#103 id=103 data-nosnippet>103</a></span><span class="attr">#[inline]
-<a href=#104 id=104 data-nosnippet>104</a></span><span class="kw">pub unsafe fn </span>unbox&lt;T&gt;(object: <span class="kw-2">&amp;</span>Il2CppObject) -&gt; T {
+<a href=#104 id=104 data-nosnippet>104</a></span><span class="kw">pub unsafe fn </span>unbox&lt;T: ValueType&gt;(object: <span class="kw-2">&amp;</span>Il2CppObject) -&gt; T {
 <a href=#105 id=105 data-nosnippet>105</a>    <span class="kw">let </span>address = object <span class="kw">as </span><span class="kw-2">*const </span>Il2CppObject <span class="kw">as </span>usize;
 <a href=#106 id=106 data-nosnippet>106</a>    <span class="kw">let </span>ptr = (address + size_of::&lt;Il2CppObject&gt;()) <span class="kw">as </span><span class="kw-2">*const </span>T;
 <a href=#107 id=107 data-nosnippet>107</a>    ptr.read_unaligned()
@@ -113,15 +113,88 @@
 <a href=#113 id=113 data-nosnippet>113</a>///
 <a href=#114 id=114 data-nosnippet>114</a>/// `Object::Box` (the underlying il2cpp function) allocates memory for the
 <a href=#115 id=115 data-nosnippet>115</a>/// boxed object, so the returned pointer is managed by the il2cpp GC
-<a href=#116 id=116 data-nosnippet>116</a></span><span class="attr">#[inline]
-<a href=#117 id=117 data-nosnippet>117</a></span><span class="kw">pub unsafe fn </span>value_box&lt;T: Type&gt;(this: <span class="kw-2">&amp;mut </span>T) -&gt; <span class="kw-2">*mut </span>T {
-<a href=#118 id=118 data-nosnippet>118</a>    <span class="comment">// TODO: WrapRaw for T?
-<a href=#119 id=119 data-nosnippet>119</a>    </span><span class="kw">let </span>boxed = functions::value_box(
-<a href=#120 id=120 data-nosnippet>120</a>        T::class().raw() <span class="kw">as </span><span class="kw-2">*const </span>Il2CppClass <span class="kw">as </span><span class="kw-2">*mut </span>Il2CppClass,
-<a href=#121 id=121 data-nosnippet>121</a>        (this <span class="kw">as </span><span class="kw-2">*mut </span>T).cast::&lt;c_void&gt;(),
-<a href=#122 id=122 data-nosnippet>122</a>    )
-<a href=#123 id=123 data-nosnippet>123</a>    .cast::&lt;T&gt;();
-<a href=#124 id=124 data-nosnippet>124</a>
-<a href=#125 id=125 data-nosnippet>125</a>    boxed
-<a href=#126 id=126 data-nosnippet>126</a>}
+<a href=#116 id=116 data-nosnippet>116</a>/// TODO: Return `Gc&lt;Il2CppObject&gt;`
+<a href=#117 id=117 data-nosnippet>117</a></span><span class="attr">#[inline]
+<a href=#118 id=118 data-nosnippet>118</a></span><span class="kw">pub unsafe fn </span>value_box_alloc&lt;T: ValueType&gt;(this: <span class="kw-2">&amp;</span>T) -&gt; <span class="kw-2">*mut </span>Il2CppObject {
+<a href=#119 id=119 data-nosnippet>119</a>    <span class="comment">// TODO: WrapRaw for T?
+<a href=#120 id=120 data-nosnippet>120</a>    </span>functions::value_box(
+<a href=#121 id=121 data-nosnippet>121</a>        T::class().raw() <span class="kw">as </span><span class="kw-2">*const </span>Il2CppClass <span class="kw">as </span><span class="kw-2">*mut </span>Il2CppClass,
+<a href=#122 id=122 data-nosnippet>122</a>        (this <span class="kw">as </span><span class="kw-2">*const </span>T).cast::&lt;c_void&gt;(),
+<a href=#123 id=123 data-nosnippet>123</a>    )
+<a href=#124 id=124 data-nosnippet>124</a>}
+<a href=#125 id=125 data-nosnippet>125</a>
+<a href=#126 id=126 data-nosnippet>126</a><span class="doccomment">/// Boxes a value type into an [`Il2CppObject`] without allocating or copying,
+<a href=#127 id=127 data-nosnippet>127</a>/// mirroring beatsaber-hook's `to_object&lt;Box = true&gt;(fake_box = true)`
+<a href=#128 id=128 data-nosnippet>128</a>///
+<a href=#129 id=129 data-nosnippet>129</a>/// Rather than calling `Object::Box`, this pretends an [`Il2CppObject`]
+<a href=#130 id=130 data-nosnippet>130</a>/// header sits right before `this`, offsetting its address back by the
+<a href=#131 id=131 data-nosnippet>131</a>/// header's size. Unboxing the result (which adds the header size back)
+<a href=#132 id=132 data-nosnippet>132</a>/// yields `this` again, but the header itself is never written, so the
+<a href=#133 id=133 data-nosnippet>133</a>/// returned pointer must never be read as a real object (e.g. its class) -
+<a href=#134 id=134 data-nosnippet>134</a>/// only unboxed back into `T`. It is only valid for as long as `this` is.
+<a href=#135 id=135 data-nosnippet>135</a>///
+<a href=#136 id=136 data-nosnippet>136</a>/// # Safety
+<a href=#137 id=137 data-nosnippet>137</a>/// The provided value must be a valid value of the given type.
+<a href=#138 id=138 data-nosnippet>138</a></span><span class="attr">#[inline]
+<a href=#139 id=139 data-nosnippet>139</a></span><span class="kw">pub unsafe fn </span>fake_value_box&lt;T: ValueType&gt;(this: <span class="kw-2">&amp;</span>T) -&gt; <span class="kw-2">*mut </span>Il2CppObject {
+<a href=#140 id=140 data-nosnippet>140</a>    <span class="comment">// https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/types.hpp#L227-L228
+<a href=#141 id=141 data-nosnippet>141</a>    // Real boxing by necessity copies the struct into the boxed object, in addition
+<a href=#142 id=142 data-nosnippet>142</a>    // to having higher overhead, so modifications would have to be copied back
+<a href=#143 id=143 data-nosnippet>143</a>    // to the original object
+<a href=#144 id=144 data-nosnippet>144</a>    </span><span class="kw">let </span>address = this <span class="kw">as </span><span class="kw-2">*const </span>T <span class="kw">as </span>usize;
+<a href=#145 id=145 data-nosnippet>145</a>    (address - size_of::&lt;Il2CppObject&gt;()) <span class="kw">as </span><span class="kw-2">*mut </span>Il2CppObject
+<a href=#146 id=146 data-nosnippet>146</a>}
+<a href=#147 id=147 data-nosnippet>147</a>
+<a href=#148 id=148 data-nosnippet>148</a><span class="attr">#[cfg(test)]
+<a href=#149 id=149 data-nosnippet>149</a></span><span class="kw">mod </span>tests {
+<a href=#150 id=150 data-nosnippet>150</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href=#151 id=151 data-nosnippet>151</a>
+<a href=#152 id=152 data-nosnippet>152</a>    <span class="doccomment">/// `unbox` must read from `size_of::&lt;Il2CppObject&gt;()` bytes past the
+<a href=#153 id=153 data-nosnippet>153</a>    /// object pointer, not from the pointer itself.
+<a href=#154 id=154 data-nosnippet>154</a>    </span><span class="attr">#[test]
+<a href=#155 id=155 data-nosnippet>155</a>    </span><span class="kw">fn </span>unbox_reads_the_value_placed_after_the_header() {
+<a href=#156 id=156 data-nosnippet>156</a>        <span class="attr">#[repr(align(<span class="number">16</span>))]
+<a href=#157 id=157 data-nosnippet>157</a>        </span><span class="kw">struct </span>Buf([u8; <span class="number">64</span>]);
+<a href=#158 id=158 data-nosnippet>158</a>
+<a href=#159 id=159 data-nosnippet>159</a>        <span class="kw">let </span><span class="kw-2">mut </span>buf = Buf([<span class="number">0</span>; <span class="number">64</span>]);
+<a href=#160 id=160 data-nosnippet>160</a>        <span class="kw">let </span>value: u32 = <span class="number">0xCAFE_F00D</span>;
+<a href=#161 id=161 data-nosnippet>161</a>
+<a href=#162 id=162 data-nosnippet>162</a>        <span class="kw">unsafe </span>{
+<a href=#163 id=163 data-nosnippet>163</a>            <span class="kw">let </span>value_ptr = buf.<span class="number">0</span>.as_mut_ptr().add(size_of::&lt;Il2CppObject&gt;()).cast::&lt;u32&gt;();
+<a href=#164 id=164 data-nosnippet>164</a>            value_ptr.write_unaligned(value);
+<a href=#165 id=165 data-nosnippet>165</a>
+<a href=#166 id=166 data-nosnippet>166</a>            <span class="kw">let </span>object = <span class="kw-2">&amp;*</span>buf.<span class="number">0</span>.as_ptr().cast::&lt;Il2CppObject&gt;();
+<a href=#167 id=167 data-nosnippet>167</a>            <span class="kw">let </span>unboxed: u32 = unbox(object);
+<a href=#168 id=168 data-nosnippet>168</a>            <span class="macro">assert_eq!</span>(unboxed, value);
+<a href=#169 id=169 data-nosnippet>169</a>        }
+<a href=#170 id=170 data-nosnippet>170</a>    }
+<a href=#171 id=171 data-nosnippet>171</a>
+<a href=#172 id=172 data-nosnippet>172</a>    <span class="doccomment">/// `fake_value_box` must not allocate: the pointer it returns is `this`'s
+<a href=#173 id=173 data-nosnippet>173</a>    /// own address, shifted back by exactly one header's worth of bytes.
+<a href=#174 id=174 data-nosnippet>174</a>    </span><span class="attr">#[test]
+<a href=#175 id=175 data-nosnippet>175</a>    </span><span class="kw">fn </span>fake_value_box_offsets_the_address_back_by_the_header_size() {
+<a href=#176 id=176 data-nosnippet>176</a>        <span class="kw">let </span>value: u64 = <span class="number">42</span>;
+<a href=#177 id=177 data-nosnippet>177</a>
+<a href=#178 id=178 data-nosnippet>178</a>        <span class="kw">unsafe </span>{
+<a href=#179 id=179 data-nosnippet>179</a>            <span class="kw">let </span>object = fake_value_box(<span class="kw-2">&amp;</span>value);
+<a href=#180 id=180 data-nosnippet>180</a>            <span class="kw">let </span>object_addr = object <span class="kw">as </span>usize;
+<a href=#181 id=181 data-nosnippet>181</a>            <span class="kw">let </span>value_addr = <span class="kw-2">&amp;</span>value <span class="kw">as </span><span class="kw-2">*const </span>u64 <span class="kw">as </span>usize;
+<a href=#182 id=182 data-nosnippet>182</a>            <span class="macro">assert_eq!</span>(object_addr + size_of::&lt;Il2CppObject&gt;(), value_addr);
+<a href=#183 id=183 data-nosnippet>183</a>        }
+<a href=#184 id=184 data-nosnippet>184</a>    }
+<a href=#185 id=185 data-nosnippet>185</a>
+<a href=#186 id=186 data-nosnippet>186</a>    <span class="doccomment">/// Boxing a value with `fake_value_box` and reading it back with `unbox`
+<a href=#187 id=187 data-nosnippet>187</a>    /// must reproduce the original value, since the two apply opposite
+<a href=#188 id=188 data-nosnippet>188</a>    /// offsets of the same size.
+<a href=#189 id=189 data-nosnippet>189</a>    </span><span class="attr">#[test]
+<a href=#190 id=190 data-nosnippet>190</a>    </span><span class="kw">fn </span>fake_value_box_round_trips_through_unbox() {
+<a href=#191 id=191 data-nosnippet>191</a>        <span class="kw">let </span>value: u64 = <span class="number">0xDEAD_BEEF_CAFE_F00D</span>;
+<a href=#192 id=192 data-nosnippet>192</a>
+<a href=#193 id=193 data-nosnippet>193</a>        <span class="kw">unsafe </span>{
+<a href=#194 id=194 data-nosnippet>194</a>            <span class="kw">let </span>object = fake_value_box(<span class="kw-2">&amp;</span>value);
+<a href=#195 id=195 data-nosnippet>195</a>            <span class="kw">let </span>unboxed: u64 = unbox(<span class="kw-2">&amp;*</span>object);
+<a href=#196 id=196 data-nosnippet>196</a>            <span class="macro">assert_eq!</span>(unboxed, value);
+<a href=#197 id=197 data-nosnippet>197</a>        }
+<a href=#198 id=198 data-nosnippet>198</a>    }
+<a href=#199 id=199 data-nosnippet>199</a>}
 </code></pre></div></section></main></body></html>

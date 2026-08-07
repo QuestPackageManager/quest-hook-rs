@@ -52,7 +52,8 @@
 <a href=#52 id=52 data-nosnippet>52</a>    <span class="kw">pub fn </span>resolve_icall(name: <span class="kw-2">*const </span>c_char) -&gt; Il2CppMethodPointer;
 <a href=#53 id=53 data-nosnippet>53</a>    <span class="kw">pub fn </span>object_new(class: <span class="kw-2">&amp;</span>Il2CppClass) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Il2CppObject;
 <a href=#54 id=54 data-nosnippet>54</a>
-<a href=#55 id=55 data-nosnippet>55</a>    <span class="kw">pub fn </span>value_box(klass: <span class="kw-2">*mut </span>Il2CppClass, data: <span class="kw-2">*mut </span>c_void) -&gt; <span class="kw-2">*mut </span>Il2CppObject;
-<a href=#56 id=56 data-nosnippet>56</a>    <span class="kw">pub fn </span>object_unbox(obj: <span class="kw-2">*mut </span>Il2CppObject) -&gt; <span class="kw-2">*mut </span>c_void;
-<a href=#57 id=57 data-nosnippet>57</a>}
+<a href=#55 id=55 data-nosnippet>55</a>    <span class="comment">// do these need to be const or mut?
+<a href=#56 id=56 data-nosnippet>56</a>    </span><span class="kw">pub fn </span>value_box(klass: <span class="kw-2">*const </span>Il2CppClass, data: <span class="kw-2">*const </span>c_void) -&gt; <span class="kw-2">*mut </span>Il2CppObject;
+<a href=#57 id=57 data-nosnippet>57</a>    <span class="kw">pub fn </span>object_unbox(obj: <span class="kw-2">*const </span>Il2CppObject) -&gt; <span class="kw-2">*const </span>c_void;
+<a href=#58 id=58 data-nosnippet>58</a>}
 </code></pre></div></section></main></body></html>
