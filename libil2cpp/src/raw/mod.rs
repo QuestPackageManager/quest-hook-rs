@@ -160,7 +160,11 @@ mod tests {
         let value: u32 = 0xCAFE_F00D;
 
         unsafe {
-            let value_ptr = buf.0.as_mut_ptr().add(size_of::<Il2CppObject>()).cast::<u32>();
+            let value_ptr = buf
+                .0
+                .as_mut_ptr()
+                .add(size_of::<Il2CppObject>())
+                .cast::<u32>();
             value_ptr.write_unaligned(value);
 
             let object = &*buf.0.as_ptr().cast::<Il2CppObject>();
