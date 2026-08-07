@@ -3,9 +3,9 @@ Linux, macOS and Android</p>
 <p>The <code>FunctionHook</code> implementation is chosen at compile time via Cargo
 features:</p>
 <ul>
-<li><code>inline_hook</code>: a vendored And64InlineHook/inlineHook.c backend for AArch64
-and ARMv7 Android.</li>
-<li><code>flamingo</code>: a [<code>flamingo_rs</code>] backend for AArch64 Android.</li>
+<li><code>inline_hook</code>: a vendored And64InlineHook/inlineHook.c backend for <code>AArch64</code>
+and <code>ARMv7</code> Android.</li>
+<li><code>flamingo</code>: a [<code>flamingo_rs</code>] backend for <code>AArch64</code> Android.</li>
 <li><code>retour</code>: a [<code>retour</code>] backend, used on non-Android targets.</li>
 </ul>
 </div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.FunctionHook.html" title="struct hook_backend::FunctionHook">Function<wbr>Hook</a></dt><dd>A function hook that works across most platforms</dd><dt><a class="struct" href="struct.HookFilter.html" title="struct hook_backend::HookFilter">Hook<wbr>Filter</a></dt><dd>Selects one or more hooks by name, namespace, or both, for use in

@@ -50,7 +50,7 @@
 <a href=#50 id=50 data-nosnippet>50</a>    </span><span class="kw">pub unsafe fn </span>uninstall(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), UninstallError&gt; {
 <a href=#51 id=51 data-nosnippet>51</a>        <span class="kw">match </span><span class="self">self</span>.detour.get() {
 <a href=#52 id=52 data-nosnippet>52</a>            <span class="prelude-val">Some</span>(detour) <span class="kw">if </span>detour.is_enabled() =&gt; {
-<a href=#53 id=53 data-nosnippet>53</a>                detour.disable().map_err(|<span class="kw">_</span>| UninstallError::Failed)
+<a href=#53 id=53 data-nosnippet>53</a>                detour.disable().map_err(|_err| UninstallError::Failed)
 <a href=#54 id=54 data-nosnippet>54</a>            }
 <a href=#55 id=55 data-nosnippet>55</a>            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(UninstallError::NotInstalled),
 <a href=#56 id=56 data-nosnippet>56</a>        }
