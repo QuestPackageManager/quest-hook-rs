@@ -28,8 +28,8 @@ Exactly one version feature must be enabled. The default is `il2cpp_v31`.
 
 | Platform | Architecture |
 |----------|-------------|
-| Android  | AArch64 (ARMv8) |
-| Android  | ARMv7 |
+| Android  | `AArch64` (`ARMv8`) |
+| Android  | `ARMv7` |
 | Windows  | x86\_64 / x86 |
 | Linux    | x86\_64 / x86 |
 | macOS    | x86\_64 |
@@ -102,7 +102,7 @@ See the [`examples/`](./examples/) directory for more complete examples includin
 | `util` | ✓ | `setup()` helper — logging + panic handler via `tracing` |
 | `cache` | ✓ | Cache class/method lookups for faster repeated access |
 | `inline_hook` | ✓ | Function hooking on Android via a vendored inline-hook backend |
-| `flamingo` | | Function hooking on Android AArch64 via the Flamingo native hooking library |
+| `flamingo` | | Function hooking on Android `AArch64` via the Flamingo native hooking library |
 | `retour` | ✓ | Function hooking on Windows/Linux/macOS via the `retour` crate |
 | `bindgen` | ✓ | Generate il2cpp bindings at build time via `bindgen` |
 | `serde` | | `Serialize`/`Deserialize` for il2cpp types |

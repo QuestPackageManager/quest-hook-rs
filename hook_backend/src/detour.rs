@@ -50,7 +50,7 @@ impl FunctionHook {
     pub unsafe fn uninstall(&self) -> Result<(), UninstallError> {
         match self.detour.get() {
             Some(detour) if detour.is_enabled() => {
-                detour.disable().map_err(|_| UninstallError::Failed)
+                detour.disable().map_err(|_err| UninstallError::Failed)
             }
             _ => Err(UninstallError::NotInstalled),
         }

@@ -73,9 +73,9 @@
 //!
 //! The `FunctionHook` implementation is chosen at compile time via Cargo
 //! features:
-//! - `inline_hook`: a vendored And64InlineHook/inlineHook.c backend for AArch64
-//!   and ARMv7 Android.
-//! - `flamingo`: a [`flamingo_rs`] backend for AArch64 Android.
+//! - `inline_hook`: a vendored And64InlineHook/inlineHook.c backend for `AArch64`
+//!   and `ARMv7` Android.
+//! - `flamingo`: a [`flamingo_rs`] backend for `AArch64` Android.
 //! - `retour`: a [`retour`] backend, used on non-Android targets.
 
 use cfg_if::cfg_if;
