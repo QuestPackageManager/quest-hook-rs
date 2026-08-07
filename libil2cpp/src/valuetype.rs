@@ -1,7 +1,7 @@
 use crate::{Arguments, Returned, Type};
 
 /// Extension trait for value types providing additional functionality
-pub trait ValueTypeExt: for<'a> Type<Held<'a> = Self> + Sized {
+pub trait ValueType: for<'a> Type<Held<'a> = Self> + Sized {
     /// Invokes the method with the given name on `self` using the given
     /// arguments, with type checking
     ///
@@ -32,7 +32,7 @@ pub trait ValueTypeExt: for<'a> Type<Held<'a> = Self> + Sized {
     }
 }
 
-impl<T> ValueTypeExt for T where T: for<'a> Type<Held<'a> = T> {}
+impl<T> ValueType for T where T: for<'a> Type<Held<'a> = T> {}
 
 /// Padding type for value types
 #[repr(transparent)]

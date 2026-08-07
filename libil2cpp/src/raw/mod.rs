@@ -24,7 +24,7 @@ use std::{
     mem::{size_of, transmute},
 };
 
-use crate::Type;
+use crate::ValueType;
 
 /// Safe wrapper around a raw il2cpp type which can be used in its place
 ///
@@ -101,7 +101,7 @@ pub unsafe trait WrapRaw: Sized {
 /// `Object::Unbox` (the underlying il2cpp function) does not allocate memory,
 /// so the returned value is a copy of the value stored in the object.
 #[inline]
-pub unsafe fn unbox<T>(object: &Il2CppObject) -> T {
+pub unsafe fn unbox<T: ValueType>(object: &Il2CppObject) -> T {
     let address = object as *const Il2CppObject as usize;
     let ptr = (address + size_of::<Il2CppObject>()) as *const T;
     ptr.read_unaligned()
@@ -115,7 +115,7 @@ pub unsafe fn unbox<T>(object: &Il2CppObject) -> T {
 /// boxed object, so the returned pointer is managed by the il2cpp GC
 /// TODO: Return `Gc<Il2CppObject>`
 #[inline]
-pub unsafe fn value_box_alloc<T: Type>(this: &T) -> *mut Il2CppObject {
+pub unsafe fn value_box_alloc<T: ValueType>(this: &T) -> *mut Il2CppObject {
     // TODO: WrapRaw for T?
     functions::value_box(
         T::class().raw() as *const Il2CppClass as *mut Il2CppClass,
@@ -136,7 +136,7 @@ pub unsafe fn value_box_alloc<T: Type>(this: &T) -> *mut Il2CppObject {
 /// # Safety
 /// The provided value must be a valid value of the given type.
 #[inline]
-pub unsafe fn fake_value_box<T: Type>(this: &T) -> *mut Il2CppObject {
+pub unsafe fn fake_value_box<T: ValueType>(this: &T) -> *mut Il2CppObject {
     // https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/types.hpp#L227-L228
     // Real boxing by necessity copies the struct into the boxed object, in addition
     // to having higher overhead, so modifications would have to be copied back
