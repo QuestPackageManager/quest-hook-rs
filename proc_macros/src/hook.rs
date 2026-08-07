@@ -2,14 +2,50 @@ use heck::{ToLowerCamelCase, ToSnakeCase};
 use proc_macro::TokenStream;
 use proc_macro2::{Group, TokenStream as TokenStream2, TokenTree as TokenTree2};
 use quote::{format_ident, quote, quote_spanned, ToTokens};
-use syn::punctuated::Punctuated;
+use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 use syn::{
     Abi, Attribute, Error, FnArg, GenericParam, Ident, ItemFn, LitStr, Pat, PatType, ReturnType,
     Token, Type, TypeTuple,
 };
 
-pub fn expand(args: &Punctuated<LitStr, Token![,]>, input: ItemFn) -> Result<TokenStream, Error> {
+/// The parsed argument list of a `#[hook(...)]` attribute: the three
+/// required target identifiers, followed by any number of optional
+/// `key = "value"` arguments.
+pub struct HookArgs {
+    namespace: LitStr,
+    class: LitStr,
+    method: LitStr,
+    extra: Vec<HookArg>,
+}
+
+impl Parse for HookArgs {
+    fn parse(input: ParseStream<'_>) -> Result<Self, Error> {
+        let namespace: LitStr = input.parse()?;
+        input.parse::<Token![,]>()?;
+        let class: LitStr = input.parse()?;
+        input.parse::<Token![,]>()?;
+        let method: LitStr = input.parse()?;
+
+        let mut extra = Vec::new();
+        while input.peek(Token![,]) {
+            input.parse::<Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+            extra.push(input.parse()?);
+        }
+
+        Ok(Self {
+            namespace,
+            class,
+            method,
+            extra,
+        })
+    }
+}
+
+pub fn expand(args: &HookArgs, input: ItemFn) -> Result<TokenStream, Error> {
     let metadata = Metadata::new(args, input)?;
     metadata.validate()?;
 
@@ -29,40 +65,161 @@ pub fn expand(args: &Punctuated<LitStr, Token![,]>, input: ItemFn) -> Result<Tok
     Ok(ts.into())
 }
 
+/// A single optional `key = "value"` argument in a `#[hook(...)]`
+/// attribute, following the three required target identifiers.
+enum HookArg {
+    /// Overrides the hook's own namespace
+    Namespace(LitStr),
+    /// A `Priority::before` filter
+    Before(LitStr),
+    /// A `Priority::after` filter
+    After(LitStr),
+}
+
+impl Parse for HookArg {
+    fn parse(input: ParseStream<'_>) -> Result<Self, Error> {
+        let key: Ident = input.parse()?;
+        input.parse::<Token![=]>()?;
+        let value: LitStr = input.parse()?;
+
+        match key.to_string().as_str() {
+            "namespace" => Ok(Self::Namespace(value)),
+            "before" => Ok(Self::Before(value)),
+            "after" => Ok(Self::After(value)),
+            other => Err(Error::new_spanned(
+                key,
+                format!("unknown hook argument `{other}`"),
+            )),
+        }
+    }
+}
+
+/// A parsed `before`/`after` filter value, mirroring
+/// `hook_backend::HookFilter` but with both fields resolved up front instead
+/// of carried around as raw strings.
+#[cfg_attr(test, derive(Debug))]
+enum HookFilter {
+    /// Matches a hook with the given name in any namespace
+    Name(String),
+    /// Matches any hook in the given namespace
+    Namespace(String),
+    /// Matches a hook with the given name in the given namespace
+    Both { namespace: String, name: String },
+}
+
+impl HookFilter {
+    /// Parses a `before`/`after` filter value in one of the forms `"name"`,
+    /// `"namespace::"`, or `"namespace::name"`.
+    fn parse(lit: &LitStr) -> Result<Self, Error> {
+        let value = lit.value();
+        let Some((namespace, name)) = value.split_once("::") else {
+            return Ok(Self::Name(value));
+        };
+        let namespace = (!namespace.is_empty()).then(|| namespace.to_string());
+        let name = (!name.is_empty()).then(|| name.to_string());
+
+        match (namespace, name) {
+            // `"namespace::name"`
+            (Some(namespace), Some(name)) => Ok(Self::Both { namespace, name }),
+            // `"namespace::"`
+            (Some(namespace), None) => Ok(Self::Namespace(namespace)),
+            // `"::"`: neither half names anything to match
+            (None, _) => Err(Error::new_spanned(
+                lit,
+                "filter must specify a namespace, a name, or both",
+            )),
+        }
+    }
+
+    /// Returns a `TokenStream2` that constructs a `hook_backend::HookFilter`
+    fn expr(&self) -> TokenStream2 {
+        let (namespace, name) = match self {
+            Self::Name(name) => (
+                quote!(::std::option::Option::None),
+                quote!(::std::option::Option::Some(#name)),
+            ),
+            Self::Namespace(namespace) => (
+                quote!(::std::option::Option::Some(#namespace)),
+                quote!(::std::option::Option::None),
+            ),
+            Self::Both { namespace, name } => (
+                quote!(::std::option::Option::Some(#namespace)),
+                quote!(::std::option::Option::Some(#name)),
+            ),
+        };
+        quote! {
+            ::quest_hook::hook_backend::HookFilter {
+                namespace: #namespace,
+                name: #name,
+            }
+        }
+    }
+}
+
 pub struct Metadata {
     namespace: String,
     class: String,
     method: String,
+    /// Overrides the hook's own namespace; defaults to the crate name
+    hook_namespace: Option<String>,
+    /// `Priority::before` filters
+    before: Vec<HookFilter>,
+    /// `Priority::after` filters
+    after: Vec<HookFilter>,
     input: ItemFn,
 }
 
 impl Metadata {
-    fn new(args: &Punctuated<LitStr, Token![,]>, input: ItemFn) -> Result<Self, Error> {
-        let mut iter = args.iter().map(LitStr::value);
+    fn new(args: &HookArgs, input: ItemFn) -> Result<Self, Error> {
+        let namespace = args.namespace.value();
+        let class = args.class.value();
+        let method = args.method.value();
 
-        macro_rules! parse {
-            () => {
-                match iter.next() {
-                    Some(a) => a,
-                    None => return Err(Error::new_spanned(args, "Expected 3 arguments")),
+        let mut hook_namespace = None;
+        let mut before = Vec::new();
+        let mut after = Vec::new();
+
+        for arg in &args.extra {
+            match arg {
+                HookArg::Namespace(value) => {
+                    if hook_namespace.is_some() {
+                        return Err(Error::new_spanned(value, "duplicate hook argument"));
+                    }
+                    hook_namespace = Some(value.value());
                 }
-            };
-        }
-
-        let namespace = parse!();
-        let class = parse!();
-        let method = parse!();
-
-        if iter.next().is_some() {
-            return Err(Error::new_spanned(args, "Expected 3 arguments"));
+                HookArg::Before(value) => before.push(HookFilter::parse(value)?),
+                HookArg::After(value) => after.push(HookFilter::parse(value)?),
+            }
         }
 
         Ok(Self {
             namespace,
             class,
             method,
+            hook_namespace,
+            before,
+            after,
             input,
         })
+    }
+
+    fn hook_namespace_expr(&self) -> TokenStream2 {
+        match &self.hook_namespace {
+            Some(ns) => quote!(#ns),
+            None => quote!(::std::env!("CARGO_PKG_NAME")),
+        }
+    }
+
+    fn priority_expr(&self) -> TokenStream2 {
+        let before = self.before.iter().map(HookFilter::expr);
+        let after = self.after.iter().map(HookFilter::expr);
+
+        quote! {
+            ::quest_hook::hook_backend::Priority {
+                before: ::std::vec![#(#before),*],
+                after: ::std::vec![#(#after),*],
+            }
+        }
     }
 
     fn validate(&self) -> Result<(), Error> {
@@ -299,7 +456,7 @@ impl Metadata {
 
         quote! {
             #vis struct #struct_name {
-                hook: ::quest_hook::hook_backend::Hook,
+                hook: ::quest_hook::hook_backend::FunctionHook,
             }
         }
     }
@@ -312,7 +469,7 @@ impl Metadata {
         quote! {
             #[allow(non_upper_case_globals)]
             #vis static #name: #struct_name = #struct_name {
-                hook: ::quest_hook::hook_backend::Hook::new(),
+                hook: ::quest_hook::hook_backend::FunctionHook::new(),
             };
         }
     }
@@ -329,12 +486,16 @@ impl Metadata {
         let return_ty = self.return_ty();
 
         let fn_name = self.fn_name();
+        let name = self.hook_name();
+        let hook_namespace = self.hook_namespace_expr();
+        let hook_name_str = self.hook_name().to_string();
 
         quote! {
-            #vis fn install(&self) -> Result<(), quest_hook::HookInstallError> {
+            #vis fn install(&self) -> Result<::quest_hook::HookHandle, quest_hook::HookInstallError> {
                 use ::std::ptr::null_mut;
                 use ::std::sync::atomic::Ordering;
                 use ::quest_hook::HookInstallError;
+                use ::quest_hook::hook_backend::HookName;
                 use ::quest_hook::libil2cpp::{Il2CppClass, WrapRaw};
 
                 if self.hook.is_installed() {
@@ -350,14 +511,34 @@ impl Metadata {
                     Err(_) => return Err(HookInstallError::MethodNotFound),
                 };
 
+                let hook_name = HookName { namespace: #hook_namespace, name: #hook_name_str };
+
                 let success = unsafe {
-                    self.hook.install(method.raw().methodPointer.unwrap() as *const (), #fn_name as *const ())
+                    self.hook.install(
+                        method.raw().methodPointer.unwrap() as *const (),
+                        #fn_name as *const (),
+                        hook_name,
+                        self.priority(),
+                    )
                 };
                 if success {
-                    Ok(())
+                    Ok(::quest_hook::HookHandle::new(&#name.hook))
                 } else {
                     Err(HookInstallError::InstallError)
                 }
+            }
+        }
+    }
+
+    /// This hook's declared `before`/`after` priority, built fresh on each
+    /// call
+    fn priority_fn(&self) -> TokenStream2 {
+        let vis = &self.input.vis;
+        let priority_expr = self.priority_expr();
+
+        quote! {
+            #vis fn priority(&self) -> ::quest_hook::hook_backend::Priority {
+                #priority_expr
             }
         }
     }
@@ -410,11 +591,13 @@ impl Metadata {
     fn struct_impl(&self) -> TokenStream2 {
         let struct_name = self.struct_name();
         let install_fn = self.install_fn();
+        let priority_fn = self.priority_fn();
         let original_fn = self.original_fn();
 
         quote! {
             impl #struct_name {
                 #install_fn
+                #priority_fn
                 #original_fn
             }
         }
@@ -432,6 +615,8 @@ impl Metadata {
         let return_ty = staticify(self.return_ty());
 
         let fn_name = self.fn_name();
+        let hook_name_str = self.hook_name().to_string();
+        let hook_namespace = self.hook_namespace_expr();
 
         quote! {
             impl ::quest_hook::Hook for #struct_name {
@@ -442,9 +627,15 @@ impl Metadata {
                 const NAMESPACE: &'static str = #namespace;
                 const CLASS_NAME: &'static str = #class;
                 const METHOD_NAME: &'static str = #method;
+                const HOOK_NAMESPACE: &'static str = #hook_namespace;
+                const HOOK_NAME: &'static str = #hook_name_str;
 
-                fn install(&self) -> Result<(), ::quest_hook::HookInstallError> {
+                fn install(&self) -> Result<::quest_hook::HookHandle, ::quest_hook::HookInstallError> {
                     self.install()
+                }
+
+                fn priority(&self) -> ::quest_hook::hook_backend::Priority {
+                    self.priority()
                 }
 
                 fn original(&self) -> Option<*const ()> {
@@ -487,4 +678,92 @@ fn staticify(tokens: impl ToTokens) -> TokenStream2 {
         }
     }
     ts
+}
+
+#[cfg(test)]
+mod tests {
+    use quote::quote;
+    use syn::LitStr;
+
+    use super::{HookArgs, HookFilter};
+
+    fn lit(value: &str) -> LitStr {
+        LitStr::new(value, proc_macro2::Span::call_site())
+    }
+
+    #[test]
+    fn filter_parses_name_only() {
+        match HookFilter::parse(&lit("my_hook")).unwrap() {
+            HookFilter::Name(name) => assert_eq!(name, "my_hook"),
+            other => panic!("expected Name, got a filter with different fields set: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn filter_parses_namespace_only() {
+        match HookFilter::parse(&lit("my_crate::")).unwrap() {
+            HookFilter::Namespace(namespace) => assert_eq!(namespace, "my_crate"),
+            other => panic!("expected Namespace, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn filter_parses_namespace_and_name() {
+        match HookFilter::parse(&lit("my_crate::my_hook")).unwrap() {
+            HookFilter::Both { namespace, name } => {
+                assert_eq!(namespace, "my_crate");
+                assert_eq!(name, "my_hook");
+            }
+            other => panic!("expected Both, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn filter_rejects_empty_namespace_and_name() {
+        assert!(HookFilter::parse(&lit("::")).is_err());
+    }
+
+    #[test]
+    fn hook_args_parses_required_and_repeated_optional_arguments() {
+        let args: HookArgs = syn::parse2(quote! {
+            "MyNamespace", "MyClass", "MyMethod",
+            namespace = "custom_ns",
+            before = "other_hook",
+            after = "ns::",
+            after = "ns::name",
+        })
+        .unwrap();
+
+        assert_eq!(args.namespace.value(), "MyNamespace");
+        assert_eq!(args.class.value(), "MyClass");
+        assert_eq!(args.method.value(), "MyMethod");
+        assert_eq!(args.extra.len(), 4);
+    }
+
+    #[test]
+    fn hook_args_allows_no_optional_arguments() {
+        let args: HookArgs = syn::parse2(quote! {
+            "MyNamespace", "MyClass", "MyMethod"
+        })
+        .unwrap();
+
+        assert!(args.extra.is_empty());
+    }
+
+    #[test]
+    fn hook_args_rejects_unknown_argument() {
+        let result: syn::Result<HookArgs> = syn::parse2(quote! {
+            "MyNamespace", "MyClass", "MyMethod",
+            frobnicate = "oops",
+        });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn hook_args_rejects_missing_required_argument() {
+        let result: syn::Result<HookArgs> = syn::parse2(quote! {
+            "MyNamespace", "MyClass"
+        });
+        assert!(result.is_err());
+    }
 }

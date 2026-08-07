@@ -81,22 +81,33 @@ use std::ops::Range;
 
 use proc_macro::TokenStream;
 use syn::parse::{Parse, ParseStream};
-use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{
-    parse_macro_input, Error, Expr, ExprLit, ExprRange, ItemFn, Lit, LitStr, RangeLimits, Result,
-    Token,
-};
+use syn::{parse_macro_input, Error, Expr, ExprLit, ExprRange, ItemFn, Lit, RangeLimits, Result};
 
 /// Creates an inline hook at a C# method.
+///
+/// The first three arguments give the namespace, class name, and method
+/// name of the C# method to hook. They may be followed by any of these
+/// optional `key = "value"` arguments:
+///
+/// * `namespace`: overrides the hook's own namespace (used to reference it
+///   from another hook's `before`/`after`), which otherwise defaults to the
+///   crate name. The hook's own name always defaults to the name of the
+///   function it wraps.
+/// * `before` / `after`: installs this hook so it runs before/after every
+///   already-installed hook matching a filter, in one of the forms
+///   `"name"` (any namespace), `"namespace::"` (any name), or
+///   `"namespace::name"`. May be repeated (including a mix of `before` and
+///   `after`) to add more constraints. Only meaningfully enforced by
+///   backends that support multiple hooks per target (currently
+///   `flamingo`).
 ///
 /// # Panics
 ///
 /// * `original` will panic if the hook has not yet been installed.
 #[proc_macro_attribute]
 pub fn hook(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let args =
-        parse_macro_input!(attr with Punctuated<LitStr, Token![,]>::parse_separated_nonempty);
+    let args = parse_macro_input!(attr as hook::HookArgs);
     let input = parse_macro_input!(item as ItemFn);
 
     match hook::expand(&args, input) {
