@@ -1,9 +1,7 @@
 #![feature(never_type)]
 #![feature(trait_alias)]
 #![feature(once_cell_try)]
-
 #![cfg_attr(feature = "gc", feature(allocator_api))]
-
 #![doc(html_root_url = "https://stackdoubleflow.github.io/quest-hook-rs/libil2cpp")]
 #![warn(
     clippy::all,

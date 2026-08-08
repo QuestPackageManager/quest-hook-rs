@@ -10,9 +10,10 @@ pub const MAX_BRANCH_SEARCH_INSTRUCTIONS: usize = 100;
 
 /// Disassembles `code` (treating `base` as the address of `code[0]`) and
 /// returns the resolved target of the `n`th (1-indexed) instruction for which
-/// `is_match` returns true. Mirrors beatsaber-hook's `cs::find_nth_b` but with a custom predicate rather than hardcoding `B`/`BL`.
-/// Gives up and returns `None` after `max_instructions` instructions, on a
-/// decode error, or if fewer than `n` matching instructions are found first. 
+/// `is_match` returns true. Mirrors beatsaber-hook's `cs::find_nth_b` but with
+/// a custom predicate rather than hardcoding `B`/`BL`. Gives up and returns
+/// `None` after `max_instructions` instructions, on a decode error, or if fewer
+/// than `n` matching instructions are found first.
 fn find_nth_matching_branch_target(
     code: &[u8],
     base: usize,
