@@ -1,5 +1,9 @@
 #![feature(never_type)]
 #![feature(trait_alias)]
+#![feature(once_cell_try)]
+
+#![cfg_attr(feature = "gc", feature(allocator_api))]
+
 #![doc(html_root_url = "https://stackdoubleflow.github.io/quest-hook-rs/libil2cpp")]
 #![warn(
     clippy::all,
@@ -104,6 +108,11 @@ mod gc;
 mod method_info;
 mod object;
 mod valuetype;
+#[cfg(feature = "xref")]
+mod xref;
+
+#[cfg(feature = "gc")]
+mod gc_safe;
 
 #[cfg_attr(
     any(feature = "unity2018", feature = "il2cpp_v24"),
@@ -127,11 +136,10 @@ pub use byref::{ByRef, ByRefMut};
 pub use class::{FindMethodError, Il2CppClass};
 pub use exception::Il2CppException;
 pub use field_info::FieldInfo;
-pub use gc::{Gc, GcType};
 pub use method_info::{Il2CppReflectionMethod, MethodInfo, Result, Void};
 pub use object::{Il2CppObject, ObjectExt, ObjectType};
 pub use parameter_info::ParameterInfo;
-pub use raw::{unbox, value_box_alloc, WrapRaw};
+pub use raw::{unbox, value_box_alloc, WrapRaw, IL2CPP_BINARY};
 pub use string::Il2CppString;
 pub use ty::{Builtin, Il2CppReflectionType, Il2CppType};
 pub use typecheck::callee::{Parameter, Parameters, Return, ThisParameter};
@@ -139,3 +147,10 @@ pub use typecheck::caller::{Argument, Arguments, Returned, ThisArgument};
 pub use typecheck::generic::Generics;
 pub use typecheck::ty::Type;
 pub use valuetype::{ValueType, ValueTypePadding};
+
+#[cfg(feature = "xref")]
+pub use xref::xref_init;
+
+#[cfg(feature = "gc")]
+pub use crate::gc_safe::*;
+pub use gc::{Gc, GcType};

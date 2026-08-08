@@ -47,6 +47,9 @@ inline_hook = ["hook_backend/inline_hook"]
 flamingo = ["hook_backend/flamingo"]
 retour = ["hook_backend/retour"]
 
+xref = ["libil2cpp/xref"]
+gc = ["libil2cpp/gc"]
+
 [[example]]
 name = "hello_world"
 crate-type = ["cdylib"]

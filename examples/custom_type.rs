@@ -22,7 +22,7 @@ fn set_position(this: &mut Il2CppObject, new_position: Vector3) {
 
 #[no_mangle]
 pub extern "C" fn setup() {
-    quest_hook::setup("custom type");
+    quest_hook::setup_log("custom type");
 }
 
 #[no_mangle]

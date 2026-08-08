@@ -56,3 +56,16 @@ il2cpp_functions! { IL2CPP_BINARY =>
     pub fn value_box(klass: *const Il2CppClass, data: *const c_void) -> *mut Il2CppObject;
     pub fn object_unbox(obj: *const Il2CppObject) -> *const c_void;
 }
+
+/// Resolves the runtime address of an exported libil2cpp symbol (e.g.
+/// `b"il2cpp_domain_get"`).
+///
+/// Unlike the functions generated above, this hands back the raw address
+/// rather than a callable wrapper - it's meant for xref use, where a known
+/// symbol is used as a disassembly starting point to locate a function that
+/// isn't itself exported.
+pub(crate) fn symbol_addr(name: &[u8]) -> Option<usize> {
+    unsafe { LIBIL2CPP.get::<*const ()>(name) }
+        .ok()
+        .map(|sym| *sym as usize)
+}

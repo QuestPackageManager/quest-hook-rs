@@ -38,7 +38,7 @@ fn validate_scene_change(scene: &mut Il2CppObject) -> bool {
 
 #[no_mangle]
 pub extern "C" fn setup() {
-    quest_hook::setup("hook priority");
+    quest_hook::setup_log("hook priority");
 }
 
 #[no_mangle]
