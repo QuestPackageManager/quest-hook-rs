@@ -18,7 +18,7 @@ use super::{
 pub const IL2CPP_BINARY: &str = "libil2cpp.so";
 
 #[cfg(target_os = "linux")]
-pub const IL2CPP_BINARY: &str = "libil2cpp.so";
+pub const IL2CPP_BINARY: &str = "GameAssembly.so";
 
 #[cfg(target_os = "windows")]
 pub const IL2CPP_BINARY: &str = "GameAssembly.dll";
