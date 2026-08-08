@@ -7,6 +7,7 @@ use crate::xref::gc::GcFunctions;
 /// An allocator that uses GC functions to allocate memory.
 /// This is useful for allocating memory that will be managed by the GC, such as
 /// objects that will be used in the Unity engine.
+#[derive(Clone, Copy)]
 pub struct GcAllocator {
     gc_functions: &'static crate::gc_safe::GcFunctions,
 }
