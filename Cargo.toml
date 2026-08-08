@@ -62,3 +62,7 @@ required-features = ["util"]
 name = "hook_priority"
 crate-type = ["cdylib"]
 required-features = ["util", "flamingo"]
+[[example]]
+name = "gc_alloc"
+crate-type = ["cdylib"]
+required-features = ["util", "gc"]
