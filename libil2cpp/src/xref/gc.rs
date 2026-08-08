@@ -2,10 +2,14 @@ use std::ffi::c_void;
 
 use crate::xref::arch::gc::{find_gc_alloc_fixed, find_gc_free, find_gc_free_fixed};
 
+/// GcAllocFixed allocates a fixed-size object in the Boehm GC heap. The object is not movable and will not be collected until it is explicitly freed.
 pub type GcAllocFixedFn = unsafe extern "C" fn(size: usize) -> *mut c_void;
+/// GcFree frees a fixed-size object allocated with GcAllocFixed. The object must not be used after it is freed.
 pub type GcFreeFn = unsafe extern "C" fn(obj: *mut c_void);
+/// GcFreeFixed frees a fixed-size object allocated with GcAllocFixed. The object must not be used after it is freed.
 pub type GcFreeFixedFn = unsafe extern "C" fn(obj: *mut c_void);
 
+/// Boehm GC functions that are used by libil2cpp. 
 pub struct GcFunctions {
     pub gc_alloc_fixed: GcAllocFixedFn,
     pub gc_free: GcFreeFn,
