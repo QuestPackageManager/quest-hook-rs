@@ -37,13 +37,15 @@ unsafe extern "C" fn gc_free_fixed_shim(obj: *mut c_void) {
 /// couldn't be resolved (only possible on unity2018/il2cpp_v24 without the
 /// `xref` feature).
 pub struct GcFunctions {
+    /// `GarbageCollector::AllocateFixed` (or equivalent) function pointer.
     pub gc_alloc_fixed: Option<GcAllocFixedFn>,
+    /// `GarbageCollector::FreeFixed` (or equivalent) function pointer.
     pub gc_free_fixed: Option<GcFreeFixedFn>,
 }
 static GC_FUNCTIONS: std::sync::OnceLock<GcFunctions> = std::sync::OnceLock::new();
 
 impl GcFunctions {
-    #[allow(unused_variables, unused_mut)]
+    #[allow(unused_variables, unused_mut, unused_assignments)]
     fn resolve(libil2cpp: &[u8]) -> Self {
         let mut gc_alloc_fixed = None;
         #[cfg(any(feature = "il2cpp_v29", feature = "il2cpp_v31"))]
@@ -66,10 +68,13 @@ impl GcFunctions {
         }
     }
 
+    /// Resolve and cache the [`GcFunctions`] instance for the given libil2cpp binary. 
+    /// This should be called once at the start of the program, before any other libil2
     pub fn init(libil2cpp: &[u8]) -> &'static Self {
         GC_FUNCTIONS.get_or_init(|| Self::resolve(libil2cpp))
     }
 
+    /// Get the cached [`GcFunctions`] instance, if it has been initialized.
     pub fn get() -> Option<&'static Self> {
         GC_FUNCTIONS.get()
     }

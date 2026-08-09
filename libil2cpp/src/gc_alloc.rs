@@ -14,6 +14,7 @@ pub struct GcAllocator {
 }
 
 impl GcAllocator {
+    /// Create a new `GcAllocator` instance. This will fail if the GC functions have not been resolved yet.
     pub fn new() -> Result<Self, String> {
         let gc_functions = GcFunctions::get().ok_or("GC functions not initialized")?;
         Ok(Self {
@@ -43,9 +44,13 @@ unsafe impl Allocator for GcAllocator {
         (self.gc_free_fixed)(ptr.as_ptr() as *mut c_void);
     }
 }
-
+/// Box with [`GcAllocator`].
 pub type GcBox<T> = Box<T, GcAllocator>;
+/// Vec with [`GcAllocator`].
 pub type GcVec<T> = Vec<T, GcAllocator>;
+/// HashMap with [`GcAllocator`].
 pub type GcHashMap<K, V> = std::collections::HashMap<K, V, GcAllocator>;
+/// Rc with [`GcAllocator`].
 pub type GcRc<T> = std::rc::Rc<T, GcAllocator>;
+/// Arc with [`GcAllocator`].
 pub type GcArc<T> = std::sync::Arc<T, GcAllocator>;
