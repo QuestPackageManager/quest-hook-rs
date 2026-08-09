@@ -4,10 +4,11 @@ use syn::parse::{Parse, ParseStream};
 use syn::Token;
 use syn::{Error, FnArg, ForeignItemFn, LitByteStr, PatType, Signature};
 
-pub struct Input(syn::Expr, Vec<ForeignItemFn>);
+pub struct Input(syn::Visibility, syn::Expr, Vec<ForeignItemFn>);
 
 impl Parse for Input {
     fn parse(input: ParseStream<'_>) -> Result<Self, Error> {
+        let vis = input.parse::<syn::Visibility>()?;
         let il2cpp_binary = input.parse::<syn::Expr>()?;
 
         // Require a `=>` token following the expression so the macro must be
@@ -18,14 +19,15 @@ impl Parse for Input {
         while !input.is_empty() {
             fns.push(input.parse::<ForeignItemFn>()?);
         }
-        Ok(Self(il2cpp_binary, fns))
+        Ok(Self(vis, il2cpp_binary, fns))
     }
 }
 
 pub fn expand(input: &Input) -> Result<TokenStream, Error> {
-    let il2cpp_lib = &input.0;
+    let vis = &input.0;
+    let il2cpp_lib = &input.1;
     let mut ts = quote! {
-        static LIBIL2CPP: LazyLock<Library> =
+        #vis static LIBIL2CPP: LazyLock<Library> =
             LazyLock::new(|| unsafe { Library::new(#il2cpp_lib) }.unwrap());
     };
 
@@ -40,7 +42,7 @@ pub fn expand(input: &Input) -> Result<TokenStream, Error> {
                 ..
             },
         ..
-    } in input.1.iter()
+    } in input.2.iter()
     {
         let name = LitByteStr::new(format!("il2cpp_{}", ident).as_bytes(), ident.span());
 

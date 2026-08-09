@@ -11,7 +11,6 @@ use super::{
     Il2CppImage, Il2CppMethodPointer, Il2CppObject, Il2CppReflectionMethod, Il2CppReflectionType,
     Il2CppString, Il2CppType, MethodInfo,
 };
-
 // https://katyscode.wordpress.com/2020/12/27/il2cpp-part-2/
 
 #[cfg(target_os = "android")]
@@ -27,7 +26,7 @@ pub const IL2CPP_BINARY: &str = "GameAssembly.dll";
 pub const IL2CPP_BINARY: &str = "GameAssembly.dylib";
 
 // functions get prefixed with "il2cpp_"
-il2cpp_functions! { IL2CPP_BINARY =>
+il2cpp_functions! { pub IL2CPP_BINARY =>
     pub fn domain_get() -> &'static Il2CppDomain;
     pub fn domain_get_assemblies(domain: &Il2CppDomain, size: &mut usize) -> &'static [&'static Il2CppAssembly];
     pub fn assembly_get_image(assembly: &Il2CppAssembly) -> Option<&'static Il2CppImage>;

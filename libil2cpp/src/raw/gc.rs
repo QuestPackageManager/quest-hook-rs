@@ -14,9 +14,11 @@ use std::ffi::c_void;
 use super::gc_alloc_fixed;
 use super::gc_free_fixed;
 
-/// GcAllocFixed allocates a fixed-size object in the Boehm GC heap. The object is not movable and will not be collected until it is explicitly freed.
+/// GcAllocFixed allocates a fixed-size object in the Boehm GC heap. The object
+/// is not movable and will not be collected until it is explicitly freed.
 pub type GcAllocFixedFn = unsafe extern "C" fn(size: usize) -> *mut c_void;
-/// GcFreeFixed frees a fixed-size object allocated with GcAllocFixed. The object must not be used after it is freed.
+/// GcFreeFixed frees a fixed-size object allocated with GcAllocFixed. The
+/// object must not be used after it is freed.
 pub type GcFreeFixedFn = unsafe extern "C" fn(obj: *mut c_void);
 
 /// `il2cpp_functions!` gives us a safe, `OnceLock`-cached Rust-ABI wrapper,
@@ -68,8 +70,9 @@ impl GcFunctions {
         }
     }
 
-    /// Resolve and cache the [`GcFunctions`] instance for the given libil2cpp binary. 
-    /// This should be called once at the start of the program, before any other libil2
+    /// Resolve and cache the [`GcFunctions`] instance for the given libil2cpp
+    /// binary. This should be called once at the start of the program,
+    /// before any other libil2
     pub fn init(libil2cpp: &[u8]) -> &'static Self {
         GC_FUNCTIONS.get_or_init(|| Self::resolve(libil2cpp))
     }

@@ -14,7 +14,8 @@ pub struct GcAllocator {
 }
 
 impl GcAllocator {
-    /// Create a new `GcAllocator` instance. This will fail if the GC functions have not been resolved yet.
+    /// Create a new `GcAllocator` instance. This will fail if the GC functions
+    /// have not been resolved yet.
     pub fn new() -> Result<Self, String> {
         let gc_functions = GcFunctions::get().ok_or("GC functions not initialized")?;
         Ok(Self {

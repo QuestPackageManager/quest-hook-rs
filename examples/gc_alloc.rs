@@ -11,8 +11,7 @@ pub extern "C" fn setup() {
 pub extern "C" fn load() {
     // Resolves the GC allocation functions from the loaded libil2cpp -
     // must run before `GcAllocator::new()` will succeed.
-    let libil2cpp = unimplemented!("Get libil2cpp bytes"); // quest_hook::get_libil2cpp_bytes().expect("failed to get libil2cpp bytes");
-    quest_hook::libil2cpp::xref_init(&[]);
+    quest_hook::libil2cpp::xref_init();
 
     // `GcBox`/`GcVec` (also `GcRc`, `GcArc`, `GcHashMap`) are just
     // `Box`/`Vec`/... parameterized with `GcAllocator`, so anything that

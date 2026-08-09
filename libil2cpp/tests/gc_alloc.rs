@@ -4,60 +4,41 @@
 //! crate would.
 //!
 //! `dlopen`/`LoadLibrary` refuse to load a shared object built for a
-//! different (os, arch) than the process loading it, so this looks up
-//! whichever fixture directory matches the target this test itself was
-//! compiled for. There's no graceful skip for a target without a fixture
-//! yet - `ensure_fixture_loadable` asserts it's there, so this fails loudly
-//! (rather than silently passing) as a reminder to add one, on any target
-//! declared below that doesn't have a fixture checked in.
+//! different (os, arch) than the process loading it, so this relies on
+//! `.cargo/config.toml` pointing this target's `runner` at
+//! `run_with_fixture.*`, which puts the fixture directory matching the
+//! target this test was compiled for on the dynamic loader's search path
+//! *before* this process starts (required - `dlopen`/`LoadLibrary` won't
+//! see a search-path env var set after the fact by the process itself).
+//! There's no graceful skip for a target without a fixture/runner set up
+//! yet - `ensure_fixture_present` asserts it's there, so this fails loudly
+//! (rather than silently passing) as a reminder to add one.
 #![cfg(feature = "xref")]
 
 use std::path::PathBuf;
+use std::sync::LazyLock;
 
-use libil2cpp::raw::IL2CPP_BINARY;
+use libil2cpp::raw::{IL2CPP_BINARY, LIBIL2CPP};
 use libil2cpp::GcAllocator;
 
-/// `tests/il2cpp_v31/<FIXTURE_DIR>/<IL2CPP_BINARY>` for whatever (os, arch)
+/// `tests/il2cpp_v31/<FIXTURE_DIR>/<IL2CPP_BINARY>` for whatever (os, arch) -
+/// must match the fixture directory name passed to `run_with_fixture.*` in
+/// `.cargo/config.toml` for this target.
 #[cfg(all(target_os = "android", target_arch = "aarch64"))]
 const FIXTURE_DIR: &str = "android-aarch64";
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-const FIXTURE_DIR: &str = "linux-x86_64";
+const FIXTURE_DIR: &str = "linux-x64";
 #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-const FIXTURE_DIR: &str = "windows-x86_64";
+const FIXTURE_DIR: &str = "windows-x64";
 #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
 const FIXTURE_DIR: &str = "macos-x86_64";
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 const FIXTURE_DIR: &str = "macos-aarch64";
 
-/// The env var the dynamic loader reads to find libraries referenced by
-/// bare name, like `IL2CPP_BINARY`.
-#[cfg(target_os = "windows")]
-const LIBRARY_SEARCH_PATH_VAR: &str = "PATH";
-#[cfg(target_os = "macos")]
-const LIBRARY_SEARCH_PATH_VAR: &str = "DYLD_LIBRARY_PATH";
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
-const LIBRARY_SEARCH_PATH_VAR: &str = "LD_LIBRARY_PATH";
-
-#[cfg(target_os = "windows")]
-const SEARCH_PATH_SEPARATOR: char = ';';
-#[cfg(not(target_os = "windows"))]
-const SEARCH_PATH_SEPARATOR: char = ':';
-
-fn prepend_to_search_path(dir: &std::path::Path) {
-    let existing = std::env::var(LIBRARY_SEARCH_PATH_VAR).unwrap_or_default();
-    let new_value = if existing.is_empty() {
-        dir.display().to_string()
-    } else {
-        format!("{}{SEARCH_PATH_SEPARATOR}{existing}", dir.display())
-    };
-    unsafe { std::env::set_var(LIBRARY_SEARCH_PATH_VAR, new_value) };
-}
-
-/// Points the dynamic loader's search path at this target's fixture
-/// directory. Panics if it isn't there - a missing fixture for a target
-/// declared in `FIXTURE_DIR` above is a setup bug, not something to skip
-/// quietly past.
-fn ensure_fixture_loadable() {
+/// Asserts the fixture binary for this target is actually checked in - a
+/// missing fixture for a target declared in `FIXTURE_DIR` above is a setup
+/// bug, not something to skip quietly past.
+fn ensure_fixture_present() {
     let fixture_dir: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
         "tests",
@@ -76,14 +57,18 @@ fn ensure_fixture_loadable() {
         std::env::consts::ARCH,
     );
 
-    prepend_to_search_path(&fixture_dir);
+    // `xref_init` assumes libil2cpp is already loaded - true on Quest,
+    // where the game process loads it long before a mod runs. Force that
+    // precondition here too, rather than relying on some other `raw::` call
+    // having incidentally triggered `LIBIL2CPP`'s lazy `dlopen` first.
+    LazyLock::force(&LIBIL2CPP);
 }
 
 #[test]
 fn gc_allocator_initializes_against_the_real_fixture() {
-    ensure_fixture_loadable();
+    ensure_fixture_present();
 
-    libil2cpp::xref_init(&[]);
+    libil2cpp::xref_init();
 
     // We deliberately stop at construction rather than actually allocating:
     // the real gc_alloc_fixed/gc_free_fixed only work once il2cpp's GC and

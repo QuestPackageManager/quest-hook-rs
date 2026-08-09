@@ -33,10 +33,10 @@ mod legacy_alloc_fixed {
 
     use super::live_code_at;
     use crate::raw;
+    use crate::raw::GcAllocFixedFn;
     use crate::xref::arch::disasm::{
         find_nth_bl_target, find_nth_branch_target, MAX_BRANCH_SEARCH_INSTRUCTIONS,
     };
-    use crate::raw::GcAllocFixedFn;
     use crate::xref::pattern::find_unique_pattern;
     use std::ffi::c_void;
 

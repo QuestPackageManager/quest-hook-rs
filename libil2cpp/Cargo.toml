@@ -23,6 +23,9 @@ features = ["std", "attributes"]
 default-features = false
 optional = true
 
+[target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
+libc = { version = "0.2", optional = true }
+
 [features]
 default = []
 il2cpp_v31 = []
@@ -34,7 +37,7 @@ bindgen = ["dep:bindgen", "dep:quest_build_helper"]
 cache = []
 trace = ["tracing"]
 
-xref = ["dep:bad64"]
+xref = ["dep:bad64", "dep:libc"]
 
 [build-dependencies]
 bindgen = { version = "0.72", optional = true }
