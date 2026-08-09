@@ -55,6 +55,13 @@ il2cpp_functions! { IL2CPP_BINARY =>
     // do these need to be const or mut?
     pub fn value_box(klass: *const Il2CppClass, data: *const c_void) -> *mut Il2CppObject;
     pub fn object_unbox(obj: *const Il2CppObject) -> *const c_void;
+
+    // Boehm GC functions - exported on every supported il2cpp version.
+    pub fn gc_free_fixed(obj: *mut c_void);
+    // Only exported directly on il2cpp_v29/v31 - on unity2018/il2cpp_v24 it
+    // has to be found by xref instead (see `crate::raw::GcFunctions`).
+    #[cfg(any(feature = "il2cpp_v29", feature = "il2cpp_v31"))]
+    pub fn gc_alloc_fixed(size: usize) -> *mut c_void;
 }
 
 /// Resolves the runtime address of an exported libil2cpp symbol (e.g.

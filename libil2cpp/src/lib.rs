@@ -1,7 +1,6 @@
 #![feature(never_type)]
 #![feature(trait_alias)]
-#![feature(once_cell_try)]
-#![cfg_attr(feature = "gc", feature(allocator_api))]
+#![feature(allocator_api)]
 #![doc(html_root_url = "https://stackdoubleflow.github.io/quest-hook-rs/libil2cpp")]
 #![warn(
     clippy::all,
@@ -109,8 +108,7 @@ mod valuetype;
 #[cfg(feature = "xref")]
 mod xref;
 
-#[cfg(feature = "gc")]
-mod gc_safe;
+mod gc_alloc;
 
 #[cfg_attr(
     any(feature = "unity2018", feature = "il2cpp_v24"),
@@ -149,6 +147,5 @@ pub use valuetype::{ValueType, ValueTypePadding};
 #[cfg(feature = "xref")]
 pub use xref::xref_init;
 
-#[cfg(feature = "gc")]
-pub use crate::gc_safe::*;
+pub use crate::gc_alloc::*;
 pub use gc::{Gc, GcType};

@@ -48,7 +48,6 @@ flamingo = ["hook_backend/flamingo"]
 retour = ["hook_backend/retour"]
 
 xref = ["libil2cpp/xref"]
-gc = ["libil2cpp/gc"]
 
 [[example]]
 name = "hello_world"
@@ -65,4 +64,4 @@ required-features = ["util", "flamingo"]
 [[example]]
 name = "gc_alloc"
 crate-type = ["cdylib"]
-required-features = ["util", "gc"]
+required-features = ["util", "xref"]

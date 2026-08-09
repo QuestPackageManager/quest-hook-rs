@@ -10,7 +10,7 @@
 //! yet - `ensure_fixture_loadable` asserts it's there, so this fails loudly
 //! (rather than silently passing) as a reminder to add one, on any target
 //! declared below that doesn't have a fixture checked in.
-#![cfg(all(feature = "gc"))]
+#![cfg(feature = "xref")]
 
 use std::path::PathBuf;
 
@@ -83,7 +83,7 @@ fn ensure_fixture_loadable() {
 fn gc_allocator_initializes_against_the_real_fixture() {
     ensure_fixture_loadable();
 
-    libil2cpp::xref_init(&[]).expect("xref_init should resolve GC functions against the fixture");
+    libil2cpp::xref_init(&[]);
 
     // We deliberately stop at construction rather than actually allocating:
     // the real gc_alloc_fixed/gc_free_fixed only work once il2cpp's GC and

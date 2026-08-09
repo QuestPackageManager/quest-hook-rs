@@ -35,7 +35,6 @@ cache = []
 trace = ["tracing"]
 
 xref = ["dep:bad64"]
-gc = ["xref"]
 
 [build-dependencies]
 bindgen = { version = "0.72", optional = true }

@@ -4,6 +4,7 @@
 //! dynamically loaded from libil2cpp.so.
 
 mod functions;
+mod gc;
 
 #[cfg(not(feature = "bindgen"))]
 #[cfg_attr(feature = "il2cpp_v31", path = "types_v31/mod.rs")]
@@ -17,6 +18,7 @@ mod types;
 mod types;
 
 pub use functions::*;
+pub use gc::*;
 pub use types::*;
 
 use std::{
