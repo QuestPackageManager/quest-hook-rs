@@ -38,11 +38,21 @@ impl<T> Gc<T> {
         self.0
     }
 
+    /// Returns an `Option` containing a reference to the value if the
+    /// pointer is not null.
     pub fn as_ref(&self) -> Option<&T> {
         unsafe { self.0.as_ref() }
     }
+    /// Returns an `Option` containing a mutable reference to the value if
+    /// the pointer is not null.
     pub fn as_mut(&mut self) -> Option<&mut T> {
         unsafe { self.0.as_mut() }
+    }
+
+    /// Ensures that the `Gc<T>` is not null, returning a `NonNullGc<T>` if it
+    /// is not null, or a `NullGcError` if it is null.
+    pub fn ensure_nonnull(&self) -> Result<NonNullGc<T>, NullGcError> {
+        NonNull::new(self.0).map(NonNullGc).ok_or(NullGcError)
     }
 }
 
@@ -254,10 +264,19 @@ where
     }
 }
 
+/// A [`Gc<T>`] that is statically known to never be null.
+///
+/// Backed by a [`NonNull<T>`] rather than a bare pointer, so - unlike
+/// `Gc<T>` - `Option<NonNullGc<T>>` is free: the compiler represents `None`
+/// as the pointer's null bit-pattern instead of needing extra space for a
+/// discriminant.
 #[repr(transparent)]
 pub struct NonNullGc<T>(NonNull<T>);
 
 impl<T> NonNullGc<T> {
+    /// Creates a `NonNullGc<T>` from anything convertible to a [`Gc<T>`]
+    /// (e.g. a `Gc<T>`, `*mut T`, or `&mut T`), returning `None` if it turns
+    /// out to be null.
     pub fn new<Ptr>(gc: Ptr) -> Option<Self>
     where
         Ptr: Into<Gc<T>>,
@@ -266,6 +285,17 @@ impl<T> NonNullGc<T> {
 
         let nonnull = NonNull::new(gc.0)?;
         Some(Self(nonnull))
+    }
+
+    /// Copies out a [`Gc<T>`] equivalent to this `NonNullGc<T>`, without
+    /// consuming it. `Gc<T>` is `Copy` (just a pointer), so this is as cheap
+    /// as a field access - it exists because `NonNullGc<T>` can't implement
+    /// `AsRef<Gc<T>>`/`Deref<Target = Gc<T>>` (it doesn't store a `Gc<T>`
+    /// anywhere - only a [`NonNull<T>`], which is what makes
+    /// `Option<NonNullGc<T>>` free - so there's no `&Gc<T>` to hand out
+    /// without an unsafe layout-reinterpreting cast).
+    pub fn as_gc(&self) -> Gc<T> {
+        Gc(self.0.as_ptr())
     }
 }
 unsafe impl<T> Send for NonNullGc<T> where T: for<'a> Type<Held<'a> = Option<&'a mut T>> {}
@@ -329,6 +359,46 @@ impl<T> From<&T> for NonNullGc<T> {
 impl<T> From<&mut T> for NonNullGc<T> {
     fn from(value: &mut T) -> Self {
         Self(NonNull::from(value))
+    }
+}
+
+impl<T> From<NonNull<T>> for NonNullGc<T> {
+    fn from(ptr: NonNull<T>) -> Self {
+        Self(ptr)
+    }
+}
+
+impl<T> From<NonNullGc<T>> for NonNull<T> {
+    fn from(non_null_gc: NonNullGc<T>) -> Self {
+        non_null_gc.0
+    }
+}
+
+/// The `Gc<T>` being converted was null.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NullGcError;
+
+impl fmt::Display for NullGcError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Gc<T> was null")
+    }
+}
+
+impl std::error::Error for NullGcError {}
+
+impl<T> TryFrom<Gc<T>> for NonNullGc<T> {
+    type Error = NullGcError;
+
+    fn try_from(gc: Gc<T>) -> Result<Self, Self::Error> {
+        NonNull::new(gc.0).map(Self).ok_or(NullGcError)
+    }
+}
+
+impl<T> TryFrom<*mut T> for NonNullGc<T> {
+    type Error = NullGcError;
+
+    fn try_from(ptr: *mut T) -> Result<Self, Self::Error> {
+        NonNull::new(ptr).map(Self).ok_or(NullGcError)
     }
 }
 
