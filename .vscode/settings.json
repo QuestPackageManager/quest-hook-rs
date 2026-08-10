@@ -1,10 +1,15 @@
 {
   "rust-analyzer.cargo.features": [
-    "il2cpp_v31",
+    "il2cpp_v29",
+    "bindgen",
     "serde",
     "util",
     "cache",
-    "trace"
+    "trace",
+    "flamingo",
+    "retour",
+    "xref"
   ],
+  "rust-analyzer.cargo.noDefaultFeatures": true,
   "rust-analyzer.imports.granularity.group": "module"
 }

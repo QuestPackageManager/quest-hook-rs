@@ -11,14 +11,13 @@ use super::{
     Il2CppImage, Il2CppMethodPointer, Il2CppObject, Il2CppReflectionMethod, Il2CppReflectionType,
     Il2CppString, Il2CppType, MethodInfo,
 };
-
 // https://katyscode.wordpress.com/2020/12/27/il2cpp-part-2/
 
 #[cfg(target_os = "android")]
 pub const IL2CPP_BINARY: &str = "libil2cpp.so";
 
 #[cfg(target_os = "linux")]
-pub const IL2CPP_BINARY: &str = "libil2cpp.so";
+pub const IL2CPP_BINARY: &str = "GameAssembly.so";
 
 #[cfg(target_os = "windows")]
 pub const IL2CPP_BINARY: &str = "GameAssembly.dll";
@@ -27,7 +26,7 @@ pub const IL2CPP_BINARY: &str = "GameAssembly.dll";
 pub const IL2CPP_BINARY: &str = "GameAssembly.dylib";
 
 // functions get prefixed with "il2cpp_"
-il2cpp_functions! { IL2CPP_BINARY =>
+il2cpp_functions! { pub IL2CPP_BINARY =>
     pub fn domain_get() -> &'static Il2CppDomain;
     pub fn domain_get_assemblies(domain: &Il2CppDomain, size: &mut usize) -> &'static [&'static Il2CppAssembly];
     pub fn assembly_get_image(assembly: &Il2CppAssembly) -> Option<&'static Il2CppImage>;
@@ -55,4 +54,24 @@ il2cpp_functions! { IL2CPP_BINARY =>
     // do these need to be const or mut?
     pub fn value_box(klass: *const Il2CppClass, data: *const c_void) -> *mut Il2CppObject;
     pub fn object_unbox(obj: *const Il2CppObject) -> *const c_void;
+
+    // Boehm GC functions - exported on every supported il2cpp version.
+    pub fn gc_free_fixed(obj: *mut c_void);
+    // Only exported directly on il2cpp_v29/v31 - on unity2018/il2cpp_v24 it
+    // has to be found by xref instead (see `crate::raw::GcFunctions`).
+    #[cfg(any(feature = "il2cpp_v29", feature = "il2cpp_v31"))]
+    pub fn gc_alloc_fixed(size: usize) -> *mut c_void;
+}
+
+/// Resolves the runtime address of an exported libil2cpp symbol (e.g.
+/// `b"il2cpp_domain_get"`).
+///
+/// Unlike the functions generated above, this hands back the raw address
+/// rather than a callable wrapper - it's meant for xref use, where a known
+/// symbol is used as a disassembly starting point to locate a function that
+/// isn't itself exported.
+pub(crate) fn symbol_addr(name: &[u8]) -> Option<usize> {
+    unsafe { LIBIL2CPP.get::<*const ()>(name) }
+        .ok()
+        .map(|sym| *sym as usize)
 }

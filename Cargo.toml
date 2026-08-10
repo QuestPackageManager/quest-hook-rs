@@ -47,6 +47,8 @@ inline_hook = ["hook_backend/inline_hook"]
 flamingo = ["hook_backend/flamingo"]
 retour = ["hook_backend/retour"]
 
+xref = ["libil2cpp/xref"]
+
 [[example]]
 name = "hello_world"
 crate-type = ["cdylib"]
@@ -59,3 +61,7 @@ required-features = ["util"]
 name = "hook_priority"
 crate-type = ["cdylib"]
 required-features = ["util", "flamingo"]
+[[example]]
+name = "gc_alloc"
+crate-type = ["cdylib"]
+required-features = ["util", "xref"]

@@ -15,12 +15,16 @@ libloading = "0.9"
 thiserror = "2"
 paste = "1"
 serde = { version = "1", optional = true }
+bad64 = { version = "0.12.0", optional = true }
 
 [dependencies.tracing]
 version = "0.1"
 features = ["std", "attributes"]
 default-features = false
 optional = true
+
+[target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
+libc = { version = "0.2", optional = true }
 
 [features]
 default = []
@@ -32,6 +36,8 @@ unity2018 = []
 bindgen = ["dep:bindgen", "dep:quest_build_helper"]
 cache = []
 trace = ["tracing"]
+
+xref = ["dep:bad64", "dep:libc"]
 
 [build-dependencies]
 bindgen = { version = "0.72", optional = true }

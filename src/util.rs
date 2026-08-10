@@ -9,7 +9,7 @@ use tracing_error::SpanTrace;
 /// [`tracing`]. Also sets up panic handling with backtrace and spantrace
 /// capture enabled.
 #[allow(clippy::needless_pass_by_value)]
-pub fn setup(tag: impl ToString) {
+pub fn setup_log(tag: impl ToString) {
     cfg_if! {
         if #[cfg(target_os = "android")] {
             paranoid_android::init(tag);

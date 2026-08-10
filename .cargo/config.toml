@@ -1,0 +1,18 @@
+# Points cargo at wrapper scripts (see libil2cpp/tests/run_with_fixture.*)
+# that put the `libil2cpp/tests/il2cpp_v31/<target>/` fixture binaries on the
+# dynamic loader's search path *before* test/example processes start - which
+# `dlopen`/`LoadLibrary` requires, since setting the search-path env var from
+# within an already-running process has no effect on that process's later
+# lookups.
+#
+# Relative paths here are resolved against the directory `cargo` is invoked
+# from, so run cargo from the workspace root (as usual) for these to resolve.
+
+[target.x86_64-unknown-linux-gnu]
+runner = ["libil2cpp/tests/run_with_fixture.sh", "linux-x64"]
+
+[target.x86_64-pc-windows-msvc]
+runner = ["powershell", "-ExecutionPolicy", "Bypass", "-File", "libil2cpp/tests/run_with_fixture.ps1", "windows-x64"]
+
+[target.x86_64-pc-windows-gnu]
+runner = ["powershell", "-ExecutionPolicy", "Bypass", "-File", "libil2cpp/tests/run_with_fixture.ps1", "windows-x64"]
