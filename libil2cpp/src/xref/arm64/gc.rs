@@ -93,6 +93,22 @@ mod legacy_alloc_fixed {
         unsafe { wrapped(size, 2) }
     }
 
+    /// Signature-scans `libil2cpp` for `GC_Malloc_Uncollectable`, returning
+    /// it as a callable function pointer - resolved from `libil2cpp`'s own
+    /// base address plus the pattern's offset into it, *not* the bare offset
+    /// `find_unique_pattern` returns.
+    fn find_gc_malloc_uncollectable(libil2cpp: &[u8]) -> Option<GcMallocUncollectableFn> {
+        let offset = find_unique_pattern(
+            libil2cpp,
+            "f5 0f 1d f8 f4 4f 01 a9 fd 7b 02 a9 fd 83 00 91 ?? ?? ?? ?? ?? ?? ?? ?? 1f 00 20 f1 f3 03 01 2a",
+            "GC_Malloc_Uncollectable",
+        )
+        .ok()?;
+
+        let addr = libil2cpp.as_ptr() as usize + offset;
+        Some(unsafe { std::mem::transmute::<usize, GcMallocUncollectableFn>(addr) })
+    }
+
     pub fn find_gc_alloc_fixed(libil2cpp: &[u8]) -> Option<GcAllocFixedFn> {
         if let Some(target) = find_domain_get_current().and_then(trace_gc_alloc_fixed) {
             GARBAGE_COLLECTOR_ALLOCATE_FIXED
@@ -107,18 +123,52 @@ mod legacy_alloc_fixed {
         // wasn't found - fall back to signature-scanning
         // `GC_Malloc_Uncollectable` and wrapping it into the shape
         // `GcAllocFixedFn` expects.
-        let addr = find_unique_pattern(
-            libil2cpp,
-            "f5 0f 1d f8 f4 4f 01 a9 fd 7b 02 a9 fd 83 00 91 ?? ?? ?? ?? ?? ?? ?? ?? 1f 00 20 f1 f3 03 01 2a",
-            "GC_Malloc_Uncollectable",
-        )
-        .ok()?;
-
-        WRAPPED_GC_MALLOC_UNCOLLECTABLE
-            .set(unsafe { std::mem::transmute::<usize, GcMallocUncollectableFn>(addr) })
-            .ok()?;
+        let found = find_gc_malloc_uncollectable(libil2cpp)?;
+        WRAPPED_GC_MALLOC_UNCOLLECTABLE.set(found).ok()?;
 
         Some(wrapper_gc_malloc_uncollectable)
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::find_gc_malloc_uncollectable;
+
+        /// The `GC_Malloc_Uncollectable` AOB pattern, with its wildcard
+        /// bytes filled in arbitrarily (they should still match, since
+        /// they're wildcards).
+        const PATTERN: [u8; 32] = [
+            0xf5, 0x0f, 0x1d, 0xf8, 0xf4, 0x4f, 0x01, 0xa9, 0xfd, 0x7b, 0x02, 0xa9, 0xfd, 0x83,
+            0x00, 0x91, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x11, 0x22, 0x1f, 0x00, 0x20, 0xf1,
+            0xf3, 0x03, 0x01, 0x2a,
+        ];
+
+        #[test]
+        fn resolves_the_patterns_absolute_address_not_its_offset() {
+            // Pad with unrelated bytes before the pattern, so a correct
+            // implementation has to add the match offset to the haystack's
+            // base address, rather than treating the offset as if it *were*
+            // the address - the bug this test guards against (it used to
+            // hand the bare offset straight to `mem::transmute` as a
+            // function pointer).
+            let mut haystack = vec![0u8; 96];
+            let pattern_offset = 40;
+            haystack[pattern_offset..pattern_offset + PATTERN.len()].copy_from_slice(&PATTERN);
+
+            let resolved = find_gc_malloc_uncollectable(&haystack)
+                .expect("the pattern was placed in the haystack, so this should match");
+
+            assert_eq!(
+                resolved,
+                haystack.as_ptr() as usize + pattern_offset,
+                "resolved address should be the pattern's absolute address in memory, not its bare offset into the haystack"
+            );
+        }
+
+        #[test]
+        fn returns_none_when_the_pattern_is_absent() {
+            let haystack = vec![0u8; 64];
+            assert!(find_gc_malloc_uncollectable(&haystack).is_none());
+        }
     }
 }
 
