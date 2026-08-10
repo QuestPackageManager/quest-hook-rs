@@ -4,7 +4,7 @@ use std::mem::transmute;
 use std::ptr::null_mut;
 
 use crate::byref::{ByRef, ReffableType};
-use crate::{Builtin, Gc, GcType, Il2CppObject, Il2CppType, MethodInfo, Type};
+use crate::{Builtin, Gc, Il2CppObject, Il2CppType, MethodInfo, Type};
 
 /// Trait implemented by types that can be used as a C# `this` arguments
 ///
@@ -119,7 +119,6 @@ where
 }
 unsafe impl<T> ThisArgument for Gc<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     type Type = T;
@@ -227,7 +226,6 @@ where
 #[rustfmt::skip]
 unsafe impl<T> Argument for Gc<T>
 where 
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 
 {
@@ -280,7 +278,7 @@ where
 }
 #[rustfmt::skip]
 unsafe impl<T> Returned for Gc<T>
-where *mut T: GcType,
+where
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     type Type = T;

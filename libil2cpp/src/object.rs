@@ -83,72 +83,59 @@ impl fmt::Debug for Il2CppObject {
     }
 }
 
-/// Helper trait for reference types which can be dereferenced to an object
-#[rustfmt::skip]
-pub trait ObjectExt:
-    for<'a> Type<Held<'a> = Option<&'a mut Self>> + DerefMut<Target = Il2CppObject> + Sized
+/// Marker trait for C# reference types - types held via a nullable pointer
+/// (`Held<'a> = Option<&'a mut Self>`), as opposed to [`crate::ValueType`]s,
+/// which are held by value (`Held<'a> = Self`). A single concrete type can
+/// only satisfy one of the two, since `Type::Held` can't be both at once.
+///
+/// Every reference type derefs to its embedded [`Il2CppObject`] header
+/// except `Il2CppObject` itself, which *is* the header - `as_object`/
+/// `as_object_mut` (what used to be a separate `ObjectType` trait, folded in
+/// here) paper over that difference with two impls below rather than one
+/// deref-based default method: an identity `Deref<Target = Self>` for
+/// `Il2CppObject` would create an infinite auto-deref cycle (every method
+/// call on any reference type would recurse forever trying to deref past
+/// `Il2CppObject`), so this can't be a single blanket default.
+pub trait RefType: for<'a> Type<Held<'a> = Option<&'a mut Self>> {
+    /// Returns a reference to the underlying [`Il2CppObject`]
+    fn as_object(&self) -> &Il2CppObject;
+    /// Returns a mutable reference to the underlying [`Il2CppObject`]
+    fn as_object_mut(&mut self) -> &mut Il2CppObject;
+}
+
+impl RefType for Il2CppObject {
+    fn as_object(&self) -> &Il2CppObject {
+        self
+    }
+
+    fn as_object_mut(&mut self) -> &mut Il2CppObject {
+        self
+    }
+}
+
+impl<T> RefType for T
+where
+    T: for<'a> Type<Held<'a> = Option<&'a mut T>> + DerefMut<Target = Il2CppObject>,
 {
+    fn as_object(&self) -> &Il2CppObject {
+        self
+    }
+
+    fn as_object_mut(&mut self) -> &mut Il2CppObject {
+        self
+    }
+}
+
+/// Helper trait for reference types which can be dereferenced to an object
+pub trait ObjectExt: RefType + Sized {
     /// Creates a new object using the constructor taking the given arguments
     fn new<A, const N: usize>(args: A) -> Gc<Self>
     where
         A: Arguments<N>,
     {
         let object: &mut Self = Self::class().instantiate();
-        object.invoke_void(".ctor", args).unwrap();
+        object.as_object_mut().invoke_void(".ctor", args).unwrap();
         object.into()
     }
 }
-#[rustfmt::skip]
-impl<T> ObjectExt for T
-where
-    for<'a> T: Type<Held<'a> = Option<&'a mut Self>>,
-    T: DerefMut<Target = Il2CppObject>,
-{
-}
-
-/// Trait for types that can be treated as ``Il2CppObject``
-/// Useful for generic constraints and supporting multiple object-like types
-pub trait ObjectType {
-    /// Returns a reference to the underlying ``Il2CppObject``
-    fn as_object(&self) -> &Il2CppObject;
-    /// Returns a mutable reference to the underlying ``Il2CppObject``
-    fn as_object_mut(&mut self) -> &mut Il2CppObject;
-}
-
-impl ObjectType for Il2CppObject {
-    fn as_object(&self) -> &Il2CppObject {
-        self
-    }
-
-    fn as_object_mut(&mut self) -> &mut Il2CppObject {
-        self
-    }
-}
-
-// implement object type for anything that can be dereferenced to Il2CppObject
-impl<T> ObjectType for *mut T
-where
-    T: ObjectType,
-{
-    fn as_object(&self) -> &Il2CppObject {
-        unsafe { self.as_ref().unwrap().as_object() }
-    }
-
-    fn as_object_mut(&mut self) -> &mut Il2CppObject {
-        unsafe { self.as_mut().unwrap().as_object_mut() }
-    }
-}
-
-impl<T> ObjectType for Gc<T>
-where
-    T: ObjectType,
-    T: for<'a> Type<Held<'a> = std::option::Option<&'a mut T>>,
-{
-    fn as_object(&self) -> &Il2CppObject {
-        self.as_ref().as_object()
-    }
-
-    fn as_object_mut(&mut self) -> &mut Il2CppObject {
-        self.as_mut().as_object_mut()
-    }
-}
+impl<T> ObjectExt for T where T: RefType {}

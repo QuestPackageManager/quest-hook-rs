@@ -1,12 +1,12 @@
 use std::alloc::{AllocError, Allocator, Layout};
 use std::ffi::c_void;
 use std::fmt::{self, Debug, Formatter};
-use std::ops::{Deref, DerefMut, Not};
+use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
 use std::sync::Arc;
 
 use crate::raw::{GcAllocFixedFn, GcFreeFixedFn, GcFunctions};
-use crate::{Gc, GcType, ObjectType, Type};
+use crate::{Gc, RefType, Type};
 
 /// An allocator that uses GC functions to allocate memory.
 /// This is useful for allocating memory that will be managed by the GC, such as
@@ -88,9 +88,9 @@ unsafe impl Sync for Wrapper {}
 /// across GC collections (unlike [`Gc<T>`], a weak, untracked pointer whose
 /// pointee the GC may collect at any time) and safe to share across
 /// threads.
-/// 
+///
 /// This is nullable, see [`Gc<T>`].
-/// 
+///
 ///
 /// Rather than moving or copying the pointee, this roots it by allocating a
 /// tiny [`Wrapper`] block holding its pointer via the Boehm GC's own fixed
@@ -100,29 +100,22 @@ unsafe impl Sync for Wrapper {}
 /// natively (via `Arc`, not GC memory) and freed once the last `SafePtr<T>`
 /// sharing it drops.
 ///
-/// This is basically a Arc<Gc<T>, GcAllocator> with useful ergonomics and reduced allocations. We have an easier time
-/// with the type erased `Wrapper` managing the GC root for when casting between types.
-/// 
+/// This is basically a [`Arc<Gc<T>, GcAllocator>`] with useful ergonomics and
+/// reduced allocations. We have an easier time with the type erased `Wrapper`
+/// managing the GC root for when casting between types.
+///
 /// Mirrors beatsaber-hook's
 /// [`safe_ptr<T>`](https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/safeptr.hpp).
 pub struct SafePtr<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     ptr: Gc<T>,
     handle: GcArc<Wrapper>,
 }
 
-// SAFETY: the pointee is rooted (see the `Wrapper` doc above) for as long as
-// `handle` (shared, refcounted) is alive, regardless of which thread drops
-// the last reference or dereferences `ptr`.
-unsafe impl<T> Send for SafePtr<T> where T: for<'a> Type<Held<'a> = Option<&'a mut T>> {}
-unsafe impl<T> Sync for SafePtr<T> where T: for<'a> Type<Held<'a> = Option<&'a mut T>> {}
-
 impl<T> SafePtr<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     /// Roots `ptr`'s pointee for as long as this `SafePtr<T>` (or any clone
@@ -154,7 +147,6 @@ where
     /// See [`Gc::<T>::up_cast`].
     pub fn up_cast<U>(&self) -> SafePtr<U>
     where
-        *mut U: GcType,
         U: for<'a> Type<Held<'a> = Option<&'a mut U>>,
         T: AsMut<U>, // ensures T is convertible to U
     {
@@ -163,16 +155,15 @@ where
             handle: Arc::clone(&self.handle),
         }
     }
-  
+
     /// Converts the current `Gc` instance to a `Gc` instance of another type.
     ///
     /// # Safety
     /// See [`Gc::<T>::down_cast`].
     pub fn down_cast<U>(&self) -> Result<SafePtr<U>, String>
     where
-        *mut U: GcType,
         U: for<'a> Type<Held<'a> = Option<&'a mut U>>,
-        T: ObjectType,
+        T: RefType,
     {
         let downcasted_ptr = self.ptr.down_cast::<U>()?;
         Ok(SafePtr {
@@ -180,11 +171,15 @@ where
             handle: Arc::clone(&self.handle),
         })
     }
+
+    /// Returns a weak reference to the underlying [`Gc<T>`] pointer.
+    pub fn as_weak(&self) -> Gc<T> {
+        self.ptr
+    }
 }
 
 impl<T> Clone for SafePtr<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     fn clone(&self) -> Self {
@@ -197,7 +192,6 @@ where
 
 impl<T> PartialEq for SafePtr<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -205,16 +199,10 @@ where
     }
 }
 
-impl <T> Eq for SafePtr<T>
-where
-    *mut T: GcType,
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
-{
-}
+impl<T> Eq for SafePtr<T> where T: for<'a> Type<Held<'a> = Option<&'a mut T>> {}
 
 impl<T> Deref for SafePtr<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     type Target = T;
@@ -223,26 +211,24 @@ where
         // SAFETY: `ptr` is rooted for as long as `self.handle` is alive (see
         // `Wrapper`'s doc comment), and was non-null when this `SafePtr` was
         // constructed (`SafePtr::new` asserts it).
-        &*self.ptr 
+        &*self.ptr
     }
 }
 
 impl<T> DerefMut for SafePtr<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     fn deref_mut(&mut self) -> &mut T {
         // SAFETY: `ptr` is rooted for as long as `self.handle` is alive (see
         // `Wrapper`'s doc comment), and was non-null when this `SafePtr` was
         // constructed (`SafePtr::new` asserts it).
-        &mut *self.ptr 
+        &mut *self.ptr
     }
 }
 
 impl<T> Debug for SafePtr<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -252,7 +238,6 @@ where
 
 impl<T> From<SafePtr<T>> for Gc<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     fn from(safe_ptr: SafePtr<T>) -> Self {
@@ -262,7 +247,6 @@ where
 
 impl<T> From<Gc<T>> for SafePtr<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     fn from(gc: Gc<T>) -> Self {

@@ -30,40 +30,100 @@ pub unsafe trait Type: 'static {
         Self::class().ty()
     }
 
-    /// Whether the type can be used as a `this` argument for the given
-    /// [`MethodInfo`]
+    /// Whether the type can be used as the implicit `this` argument when
+    /// Rust code calls the given C# instance [`MethodInfo`] - i.e. whether
+    /// `Self` is (or derives from) the method's declaring class.
+    ///
+    /// "Argument" means Rust is the caller here, supplying `this` to native
+    /// code; see [`matches_this_parameter`](Type::matches_this_parameter)
+    /// for the reverse direction.
     fn matches_this_argument(method: &MethodInfo) -> bool {
         method.class().is_assignable_from(Self::class())
     }
 
-    /// Whether the type can be used as a `this` parameter for the given
-    /// [`MethodInfo`]
+    /// Whether the type can receive the implicit `this` argument when C#
+    /// code calls into Rust as the given instance [`MethodInfo`]'s
+    /// implementation.
+    ///
+    /// The callee-side mirror of
+    /// [`matches_this_argument`](Type::matches_this_argument) - the
+    /// assignability check is reversed because caller and callee swap roles
+    /// (here `Self` is the expected/declared type and `method`'s class is
+    /// the value being checked against it, rather than the other way
+    /// around).
     fn matches_this_parameter(method: &MethodInfo) -> bool {
         Self::class().is_assignable_from(method.class())
     }
 
-    /// Whether a reference to the type can be used as an argument of the given
-    /// [`Il2CppType`]
+    /// Whether a *reference* to the type (a GC pointer, e.g. a
+    /// [`Gc<T>`](crate::Gc)) can be passed as an argument of the given
+    /// [`Il2CppType`] when Rust calls a C# method.
+    ///
+    /// "Argument" means Rust is the caller, supplying the value to native
+    /// code. True C# reference types (classes, boxed values, strings, ...) are
+    /// always passed by pointer and so implement this by checking
+    /// assignability alone, ignoring [`Il2CppType::is_ref`] entirely (see
+    /// [`unsafe_impl_reference_type!`](crate::unsafe_impl_reference_type)).
+    /// 
+    /// A C# *value* type parameter declared `ref`/`out`/`in` is passed by
+    /// pointer too, though, so [`ValueType`](crate::ValueType)s also
+    /// implement this - but only when `ty.is_ref()` is set, since an
+    /// ordinary (non-byref) value-type parameter must go by value instead
+    /// (see [`matches_value_argument`](Type::matches_value_argument)).
     fn matches_reference_argument(ty: &Il2CppType) -> bool;
-    /// Whether a value of the type can be used as an argument of the given
-    /// [`Il2CppType`]
+
+    /// Whether a *value* of the type (the raw struct bytes, not a pointer)
+    /// can be passed as an argument of the given [`Il2CppType`] when Rust
+    /// calls a C# method.
+    ///
+    /// Only meaningful for [`ValueType`](crate::ValueType)s, which match
+    /// when `ty` is *not* declared `ref`/`out`/`in` (see
+    /// [`Il2CppType::is_ref`]) and is assignable - a byref value-type
+    /// parameter is passed by pointer instead and is matched by
+    /// [`matches_reference_argument`](Type::matches_reference_argument).
+    /// True reference types unconditionally return `false` here, since their
+    /// representation is never raw bytes at the ABI boundary.
     fn matches_value_argument(ty: &Il2CppType) -> bool;
 
-    /// Whether a reference to the type can be used as a parameter of the given
-    /// [`Il2CppType`]
+    /// Whether a *reference* to the type can be received as a parameter of
+    /// the given [`Il2CppType`] when C# calls into Rust.
+    ///
+    /// The callee-side mirror of
+    /// [`matches_reference_argument`](Type::matches_reference_argument) -
+    /// see that method for what "reference" means and why
+    /// [`ValueType`](crate::ValueType)s only implement this when
+    /// [`ty.is_ref()`](Il2CppType::is_ref) is set. As with
+    /// [`matches_this_parameter`](Type::matches_this_parameter), the
+    /// assignability check is reversed relative to the argument-side
+    /// version because caller and callee swap roles.
     fn matches_reference_parameter(ty: &Il2CppType) -> bool;
-    /// Whether a value of the type can be used as a parameter of the given
-    /// [`Il2CppType`]
+    
+    /// Whether a *value* of the type can be received as a parameter of the
+    /// given [`Il2CppType`] when C# calls into Rust.
+    ///
+    /// The callee-side mirror of
+    /// [`matches_value_argument`](Type::matches_value_argument) - see that
+    /// method for why only non-byref [`ValueType`](crate::ValueType)s match
+    /// and why true reference types always return `false` here.
     fn matches_value_parameter(ty: &Il2CppType) -> bool;
 
-    /// Whether the type can be used as the value of the given  [`Il2CppType`]
-    /// returned from a C# method
+    /// Whether the type can hold the value of the given [`Il2CppType`] when
+    /// it comes back as the return value of a C# method Rust called.
+    ///
+    /// Rust is the caller here, receiving the value; see
+    /// [`matches_return`](Type::matches_return) for the callee-side check
+    /// used when a Rust function is invoked as a C# method's implementation.
     fn matches_returned(ty: &Il2CppType) -> bool {
         Self::class().is_assignable_from(ty.class())
     }
 
-    /// Whether the type can be used as the return value of the  given
-    /// [`Il2CppType`] for a C# method
+    /// Whether the type can be returned as the given [`Il2CppType`] when
+    /// this Rust function is invoked as a C# method's implementation, handing
+    /// the value back to native code.
+    ///
+    /// The callee-side mirror of [`matches_returned`](Type::matches_returned)
+    /// - the assignability check is reversed for the same reason as
+    /// [`matches_this_parameter`](Type::matches_this_parameter).
     fn matches_return(ty: &Il2CppType) -> bool {
         ty.class().is_assignable_from(Self::class())
     }

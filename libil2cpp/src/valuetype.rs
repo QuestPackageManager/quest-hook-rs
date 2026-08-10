@@ -1,4 +1,7 @@
-use crate::{Arguments, Returned, Type};
+use std::fmt::{self, Debug, Formatter};
+use std::ops::{Deref, DerefMut};
+
+use crate::{Arguments, Gc, Il2CppObject, Returned, Type};
 
 /// Extension trait for value types providing additional functionality
 pub trait ValueType: for<'a> Type<Held<'a> = Self> + Sized {
@@ -30,9 +33,92 @@ pub trait ValueType: for<'a> Type<Held<'a> = Self> + Sized {
         let method = Self::class().find_method::<A, (), N>(name).unwrap();
         unsafe { method.invoke_unchecked(self, args) }
     }
+
+    /// Converts the value type into a boxed value type, which is a reference
+    /// type.
+    fn as_boxed(&mut self) -> Gc<BoxedValue<Self>> {
+        let boxed = unsafe { crate::value_box_alloc::<Self>(self) };
+        boxed
+    }
 }
 
 impl<T> ValueType for T where T: for<'a> Type<Held<'a> = T> {}
+
+/// A boxed C# value type sitting on the GC heap - the result of boxing a
+/// [`ValueType`] (see [`crate::raw::value_box_alloc`]).
+///
+/// Unlike `T` itself, which is never null/GC-tracked (C# value types are
+/// held by value, not by reference - see [`ValueType`]'s `Held<'a> = Self`
+/// bound), a `BoxedValue<T>` is reference-shaped, matching how C# actually
+/// treats a boxed value: `Gc<BoxedValue<T>>` is the equivalent of a C#
+/// `object` holding a boxed `T`. This is why boxing can't just produce a
+/// `Gc<T>` directly - `T: ValueType` and `T` satisfying `Gc`'s reference-type
+/// bound are mutually exclusive.
+///
+/// The layout mirrors the real in-memory representation: an
+/// [`Il2CppObject`] header immediately followed by `T`'s data.
+#[repr(C)]
+pub struct BoxedValue<T: ValueType> {
+    header: Il2CppObject,
+    value: T,
+}
+
+impl<T> From<Gc<BoxedValue<T>>> for Option<T> where
+    T: ValueType + Clone,
+{
+    fn from(boxed: Gc<BoxedValue<T>>) -> Self {
+        boxed.as_opt().map(|b| b.value.clone())
+    }
+}
+
+impl<T> Debug for BoxedValue<T>
+where
+    T: ValueType + Debug,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "BoxedValue<{}>({:?})", T::CLASS_NAME, self.value)
+    }
+}
+
+impl<T: ValueType> Deref for BoxedValue<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.value
+    }
+}
+
+impl<T: ValueType> DerefMut for BoxedValue<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.value
+    }
+}
+
+unsafe impl<T: ValueType> Type for BoxedValue<T> {
+    type Held<'a> = Option<&'a mut Self>;
+
+    type HeldRaw = *mut Self;
+
+    const NAMESPACE: &'static str = T::NAMESPACE;
+
+    const CLASS_NAME: &'static str = T::CLASS_NAME;
+
+    fn matches_reference_argument(ty: &crate::Il2CppType) -> bool {
+        ty.class().is_assignable_from(Self::class())
+    }
+
+    fn matches_value_argument(_ty: &crate::Il2CppType) -> bool {
+        false
+    }
+
+    fn matches_reference_parameter(ty: &crate::Il2CppType) -> bool {
+        Self::class().is_assignable_from(ty.class())
+    }
+
+    fn matches_value_parameter(_ty: &crate::Il2CppType) -> bool {
+        false
+    }
+}
 
 /// Padding type for value types
 #[repr(transparent)]

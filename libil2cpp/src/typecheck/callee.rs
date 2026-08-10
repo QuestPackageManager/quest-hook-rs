@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::byref::ReffableType;
-use crate::{Builtin, ByRef, Gc, GcType, Il2CppType, MethodInfo, Type};
+use crate::{Builtin, ByRef, Gc, Il2CppType, MethodInfo, Type};
 
 /// Trait implemented by types that can be used as C# `this` method parameters
 ///
@@ -216,7 +216,6 @@ where
 #[rustfmt::skip]
 unsafe impl<T> ThisParameter for Gc<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     type Actual = Self;
@@ -255,7 +254,6 @@ where
 #[rustfmt::skip]
 unsafe impl<T> Parameter for Gc<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     type Actual = Self;
@@ -293,7 +291,6 @@ where T: ReffableType,
 #[rustfmt::skip]
 unsafe impl<T> Return for Gc<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     type Actual = Self;

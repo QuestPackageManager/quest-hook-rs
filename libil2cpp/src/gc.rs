@@ -1,48 +1,21 @@
-use std::ffi::c_void;
 use std::fmt::{self, Debug, Formatter};
 use std::ops::{Deref, DerefMut, Not};
-use std::sync::Arc;
 
-use crate::{
-    Argument, GcAllocator, Il2CppObject, ObjectType, Returned, ThisArgument, Type, ValueType,
-};
+use crate::{Il2CppObject, RefType, SafePtr, Type, ValueType};
 
 /// Wrapper type which implies the type is GC managed lifetime
 /// This is a Weak pointer to the GC managed object. If you want to hold a
 /// strong reference, use [`crate::GcBox<T>`] instead.
-/// 
-/// This is nullable, and can be used to represent a null reference to a GC managed object.
+///
+/// This is nullable, and can be used to represent a null reference to a GC
+/// managed object.
 #[repr(C)]
 pub struct Gc<T>(*mut T)
 where
-    *mut T: GcType, // assert that *mut T is a GcType
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>;
-
-/// A boxed C# value type sitting on the GC heap - the result of boxing a
-/// [`ValueType`] (see [`crate::raw::value_box_alloc`]).
-///
-/// Unlike `T` itself, which is never null/GC-tracked (C# value types are
-/// held by value, not by reference - see [`ValueType`]'s `Held<'a> = Self`
-/// bound), a `BoxedValue<T>` is reference-shaped, matching how C# actually
-/// treats a boxed value: `Gc<BoxedValue<T>>` is the equivalent of a C#
-/// `object` holding a boxed `T`. This is why boxing can't just produce a
-/// `Gc<T>` directly - `T: ValueType` and `T` satisfying `Gc`'s reference-type
-/// bound are mutually exclusive.
-///
-/// The layout mirrors the real in-memory representation: an
-/// [`Il2CppObject`] header immediately followed by `T`'s data.
-#[repr(C)]
-pub struct BoxedValue<T: ValueType> {
-    header: Il2CppObject,
-    value: T,
-}
-
-/// Trait alias for types that can be used with the `Gc` wrapper.
-pub trait GcType = Type + Returned + ThisArgument + Argument;
 
 impl<T> Gc<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     /// Creates a new `Gc` instance with the given pointer.
@@ -86,7 +59,6 @@ where
     /// Relies on the `T` implementation of `AsMut<U>` to be correct.
     pub fn up_cast<U>(mut self) -> Gc<U>
     where
-        *mut U: GcType,
         U: for<'a> Type<Held<'a> = Option<&'a mut U>>,
         T: AsMut<U>, // ensures T is convertible to U
     {
@@ -105,9 +77,8 @@ where
     /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/2604126ec26dd807da0be0ad974056d1f5fe9575/shared/utils/il2cpp-utils-classes.hpp#L185-L212>
     pub fn down_cast<U>(mut self) -> Result<Gc<U>, String>
     where
-        *mut U: GcType,
         U: for<'a> Type<Held<'a> = Option<&'a mut U>>,
-        T: ObjectType,
+        T: RefType,
     {
         match self.as_opt_mut() {
             Some(value) => {
@@ -127,11 +98,16 @@ where
             None => Ok(Gc::null()),
         }
     }
+
+    /// Converts the current `Gc` instance to a `SafePtr` instance of the same
+    /// type.
+    pub fn into_safe_ptr(self) -> SafePtr<T> {
+        SafePtr::new(self)
+    }
 }
 
 unsafe impl<T> Type for Gc<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     type Held<'a> = Self;
@@ -165,7 +141,6 @@ unsafe impl<T> Sync for Gc<T> where T: for<'a> Type<Held<'a> = Option<&'a mut T>
 
 impl<T> From<Gc<T>> for Option<&T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     fn from(value: Gc<T>) -> Self {
@@ -174,7 +149,6 @@ where
 }
 impl<T> From<Gc<T>> for Option<&mut T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     fn from(value: Gc<T>) -> Self {
@@ -184,39 +158,26 @@ where
 
 impl<T> PartialEq for Gc<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 }
-impl<T> Eq for Gc<T>
-where
-    *mut T: GcType,
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
-{
-}
+impl<T> Eq for Gc<T> where T: for<'a> Type<Held<'a> = Option<&'a mut T>> {}
 
 impl<T> Clone for Gc<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     fn clone(&self) -> Self {
         *self
     }
 }
-impl<T> Copy for Gc<T>
-where
-    *mut T: GcType,
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
-{
-}
+impl<T> Copy for Gc<T> where T: for<'a> Type<Held<'a> = Option<&'a mut T>> {}
 
 impl<T> Default for Gc<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     fn default() -> Self {
@@ -226,7 +187,6 @@ where
 
 impl<T> Deref for Gc<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     type Target = T;
@@ -244,7 +204,6 @@ where
 }
 impl<T> DerefMut for Gc<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -261,7 +220,6 @@ where
 
 impl<T> AsRef<T> for Gc<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     fn as_ref(&self) -> &T {
@@ -270,7 +228,6 @@ where
 }
 impl<T> AsMut<T> for Gc<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     fn as_mut(&mut self) -> &mut T {
@@ -280,7 +237,6 @@ where
 
 impl<T> From<*mut T> for Gc<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     fn from(ptr: *mut T) -> Self {
@@ -289,7 +245,6 @@ where
 }
 impl<T> From<*const T> for Gc<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     fn from(ptr: *const T) -> Self {
@@ -298,7 +253,6 @@ where
 }
 impl<T> From<&mut T> for Gc<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     fn from(ptr: &mut T) -> Self {
@@ -307,7 +261,6 @@ where
 }
 impl<T> From<Option<&mut T>> for Gc<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     fn from(ptr: Option<&mut T>) -> Self {
@@ -320,7 +273,6 @@ where
 
 impl<T> Debug for Gc<T>
 where
-    *mut T: GcType,
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -331,55 +283,6 @@ where
         }
     }
 }
-impl<T> Debug for BoxedValue<T>
-where
-    T: ValueType + Debug,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "BoxedValue<{}>({:?})", T::CLASS_NAME, self.value)
-    }
-}
-
-impl<T: ValueType> Deref for BoxedValue<T> {
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        &self.value
-    }
-}
-
-impl<T: ValueType> DerefMut for BoxedValue<T> {
-    fn deref_mut(&mut self) -> &mut T {
-        &mut self.value
-    }
-}
-
-unsafe impl<T: ValueType> Type for BoxedValue<T> {
-    type Held<'a> = Option<&'a mut Self>;
-
-    type HeldRaw = *mut Self;
-
-    const NAMESPACE: &'static str = T::NAMESPACE;
-
-    const CLASS_NAME: &'static str = T::CLASS_NAME;
-
-    fn matches_reference_argument(ty: &crate::Il2CppType) -> bool {
-        ty.class().is_assignable_from(Self::class())
-    }
-
-    fn matches_value_argument(_ty: &crate::Il2CppType) -> bool {
-        false
-    }
-
-    fn matches_reference_parameter(ty: &crate::Il2CppType) -> bool {
-        Self::class().is_assignable_from(ty.class())
-    }
-
-    fn matches_value_parameter(_ty: &crate::Il2CppType) -> bool {
-        false
-    }
-}
-
 #[cfg(feature = "serde")]
 mod serde {
 
@@ -388,11 +291,10 @@ mod serde {
 
     use crate::Type;
 
-    use super::{Gc, GcType};
+    use super::Gc;
 
     impl<'de, T> Deserialize<'de> for Gc<T>
     where
-        *mut T: GcType,
         T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
         for<'a> &'a mut T: Deserialize<'de>,
     {
@@ -409,7 +311,6 @@ mod serde {
     where
         T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
         for<'a> Option<&'a T>: Serialize,
-        *mut T: GcType,
     {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where

@@ -133,7 +133,7 @@ pub use class::{FindMethodError, Il2CppClass};
 pub use exception::Il2CppException;
 pub use field_info::FieldInfo;
 pub use method_info::{Il2CppReflectionMethod, MethodInfo, Result, Void};
-pub use object::{Il2CppObject, ObjectExt, ObjectType};
+pub use object::{Il2CppObject, ObjectExt, RefType};
 pub use parameter_info::ParameterInfo;
 pub use raw::{unbox, value_box_alloc, WrapRaw, IL2CPP_BINARY};
 pub use string::Il2CppString;
@@ -142,10 +142,10 @@ pub use typecheck::callee::{Parameter, Parameters, Return, ThisParameter};
 pub use typecheck::caller::{Argument, Arguments, Returned, ThisArgument};
 pub use typecheck::generic::Generics;
 pub use typecheck::ty::Type;
-pub use valuetype::{ValueType, ValueTypePadding};
+pub use valuetype::{BoxedValue, ValueType, ValueTypePadding};
 
 #[cfg(feature = "xref")]
 pub use xref::xref_init;
 
 pub use crate::gc_alloc::*;
-pub use gc::{BoxedValue, Gc, GcType};
+pub use gc::Gc;
