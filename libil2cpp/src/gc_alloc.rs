@@ -67,9 +67,10 @@ pub type GcArc<T> = std::sync::Arc<T, GcAllocator>;
 /// allocation itself isn't freed, its `inst` pointer can't be collected.
 ///
 /// Kept alive (and freed once the last [`SafePtr<T>`] sharing it drops) by
-/// storing it as a plain `Arc<Box<Wrapper, GcAllocator>>` - both `Arc` and
-/// `Box` already deallocate correctly on their own, so there's no need for
-/// a hand-rolled handle type with a custom `Drop` impl.
+/// storing it as a plain [`GcArc<Wrapper>`] - `Arc<T, GcAllocator>` already
+/// puts its refcounts and `T` in one `gc_alloc_fixed`-backed allocation and
+/// deallocates correctly on its own, so there's no need for a hand-rolled
+/// handle type, a custom `Drop` impl, or a separate `Box` layer.
 ///
 /// Mirrors beatsaber-hook's `safe_ptr<T>::wrapper`.
 #[repr(C)]
@@ -106,7 +107,7 @@ where
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
 {
     ptr: Gc<T>,
-    handle: Arc<Box<Wrapper, GcAllocator>>,
+    handle: GcArc<Wrapper>,
 }
 
 // SAFETY: the pointee is rooted (see the `Wrapper` doc above) for as long as
@@ -130,7 +131,7 @@ where
         let ptr = ptr.get_pointer() as *mut T;
 
         let allocator = GcAllocator::new().expect("GcAllocator not initialized");
-        let wrapper = Box::new_in(
+        let handle: GcArc<Wrapper> = Arc::new_in(
             Wrapper {
                 inst: ptr.cast::<c_void>(),
             },
@@ -139,7 +140,7 @@ where
 
         Self {
             ptr: Gc::from(ptr),
-            handle: Arc::new(wrapper),
+            handle,
         }
     }
 
