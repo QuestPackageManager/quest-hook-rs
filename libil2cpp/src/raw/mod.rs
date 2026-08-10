@@ -26,7 +26,7 @@ use std::{
     mem::{size_of, transmute},
 };
 
-use crate::ValueType;
+use crate::{BoxedValue, Gc, ValueType};
 
 /// Safe wrapper around a raw il2cpp type which can be used in its place
 ///
@@ -109,20 +109,20 @@ pub unsafe fn unbox<T: ValueType>(object: &Il2CppObject) -> T {
     ptr.read_unaligned()
 }
 
-/// Boxes a value type into an [`Il2CppObject`]
+/// Boxes a value type into a [`BoxedValue<T>`]
 /// # Safety
 /// The provided value must be a valid value of the given type.
 ///
 /// `Object::Box` (the underlying il2cpp function) allocates memory for the
 /// boxed object, so the returned pointer is managed by the il2cpp GC
-/// TODO: Return `Gc<Il2CppObject>`
 #[inline]
-pub unsafe fn value_box_alloc<T: ValueType>(this: &T) -> *mut Il2CppObject {
+pub unsafe fn value_box_alloc<T: ValueType>(this: &T) -> Gc<BoxedValue<T>> {
     // TODO: WrapRaw for T?
-    functions::value_box(
+    let object = functions::value_box(
         T::class().raw() as *const Il2CppClass as *mut Il2CppClass,
         (this as *const T).cast::<c_void>(),
-    )
+    );
+    object.cast::<BoxedValue<T>>().into()
 }
 
 /// Boxes a value type into an [`Il2CppObject`] without allocating or copying,

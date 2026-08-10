@@ -1,14 +1,41 @@
+use std::ffi::c_void;
 use std::fmt::{self, Debug, Formatter};
 use std::ops::{Deref, DerefMut, Not};
+use std::sync::Arc;
 
-use crate::{Argument, ObjectType, Returned, ThisArgument, Type};
+use crate::{
+    Argument, GcAllocator, Il2CppObject, ObjectType, Returned, ThisArgument, Type, ValueType,
+};
 
 /// Wrapper type which implies the type is GC managed lifetime
+/// This is a Weak pointer to the GC managed object. If you want to hold a
+/// strong reference, use [`crate::GcBox<T>`] instead.
+/// 
+/// This is nullable, and can be used to represent a null reference to a GC managed object.
 #[repr(C)]
 pub struct Gc<T>(*mut T)
 where
     *mut T: GcType, // assert that *mut T is a GcType
     T: for<'a> Type<Held<'a> = Option<&'a mut T>>;
+
+/// A boxed C# value type sitting on the GC heap - the result of boxing a
+/// [`ValueType`] (see [`crate::raw::value_box_alloc`]).
+///
+/// Unlike `T` itself, which is never null/GC-tracked (C# value types are
+/// held by value, not by reference - see [`ValueType`]'s `Held<'a> = Self`
+/// bound), a `BoxedValue<T>` is reference-shaped, matching how C# actually
+/// treats a boxed value: `Gc<BoxedValue<T>>` is the equivalent of a C#
+/// `object` holding a boxed `T`. This is why boxing can't just produce a
+/// `Gc<T>` directly - `T: ValueType` and `T` satisfying `Gc`'s reference-type
+/// bound are mutually exclusive.
+///
+/// The layout mirrors the real in-memory representation: an
+/// [`Il2CppObject`] header immediately followed by `T`'s data.
+#[repr(C)]
+pub struct BoxedValue<T: ValueType> {
+    header: Il2CppObject,
+    value: T,
+}
 
 /// Trait alias for types that can be used with the `Gc` wrapper.
 pub trait GcType = Type + Returned + ThisArgument + Argument;
@@ -57,7 +84,7 @@ where
     ///
     /// # Safety
     /// Relies on the `T` implementation of `AsMut<U>` to be correct.
-    pub fn cast<U>(mut self) -> Gc<U>
+    pub fn up_cast<U>(mut self) -> Gc<U>
     where
         *mut U: GcType,
         U: for<'a> Type<Held<'a> = Option<&'a mut U>>,
@@ -68,11 +95,12 @@ where
             None => Gc::null(),
         }
     }
+
     /// Converts the current `Gc` instance to a `Gc` instance of another type.
     ///
     /// # Safety
     /// Relies on the `T` implementation of `AsMut<U>` to be correct.
-    ///
+    /// See [`Gc::<T>::up_cast`] for a similar function.
     /// C++ Implementation
     /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/2604126ec26dd807da0be0ad974056d1f5fe9575/shared/utils/il2cpp-utils-classes.hpp#L185-L212>
     pub fn down_cast<U>(mut self) -> Result<Gc<U>, String>
@@ -301,6 +329,54 @@ where
         } else {
             write!(f, "Gc<{}>({:p})", T::CLASS_NAME, self.0)
         }
+    }
+}
+impl<T> Debug for BoxedValue<T>
+where
+    T: ValueType + Debug,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "BoxedValue<{}>({:?})", T::CLASS_NAME, self.value)
+    }
+}
+
+impl<T: ValueType> Deref for BoxedValue<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.value
+    }
+}
+
+impl<T: ValueType> DerefMut for BoxedValue<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.value
+    }
+}
+
+unsafe impl<T: ValueType> Type for BoxedValue<T> {
+    type Held<'a> = Option<&'a mut Self>;
+
+    type HeldRaw = *mut Self;
+
+    const NAMESPACE: &'static str = T::NAMESPACE;
+
+    const CLASS_NAME: &'static str = T::CLASS_NAME;
+
+    fn matches_reference_argument(ty: &crate::Il2CppType) -> bool {
+        ty.class().is_assignable_from(Self::class())
+    }
+
+    fn matches_value_argument(_ty: &crate::Il2CppType) -> bool {
+        false
+    }
+
+    fn matches_reference_parameter(ty: &crate::Il2CppType) -> bool {
+        Self::class().is_assignable_from(ty.class())
+    }
+
+    fn matches_value_parameter(_ty: &crate::Il2CppType) -> bool {
+        false
     }
 }
 

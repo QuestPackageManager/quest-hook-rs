@@ -148,4 +148,4 @@ pub use valuetype::{ValueType, ValueTypePadding};
 pub use xref::xref_init;
 
 pub use crate::gc_alloc::*;
-pub use gc::{Gc, GcType};
+pub use gc::{BoxedValue, Gc, GcType};
