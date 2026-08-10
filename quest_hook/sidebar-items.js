@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"attr":["hook"],"enum":["HookInstallError"],"fn":["panic_hook","setup"],"struct":["HookHandle"],"trait":["Hook"]};
+window.SIDEBAR_ITEMS = {"attr":["hook"],"enum":["HookInstallError"],"fn":["panic_hook","setup_log"],"struct":["HookHandle"],"trait":["Hook"]};
