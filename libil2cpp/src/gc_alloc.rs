@@ -90,6 +90,7 @@ unsafe impl Sync for Wrapper {}
 /// threads.
 /// 
 /// This is nullable, see [`Gc<T>`].
+/// 
 ///
 /// Rather than moving or copying the pointee, this roots it by allocating a
 /// tiny [`Wrapper`] block holding its pointer via the Boehm GC's own fixed
@@ -99,6 +100,9 @@ unsafe impl Sync for Wrapper {}
 /// natively (via `Arc`, not GC memory) and freed once the last `SafePtr<T>`
 /// sharing it drops.
 ///
+/// This is basically a Arc<Gc<T>, GcAllocator> with useful ergonomics and reduced allocations. We have an easier time
+/// with the type erased `Wrapper` managing the GC root for when casting between types.
+/// 
 /// Mirrors beatsaber-hook's
 /// [`safe_ptr<T>`](https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/safeptr.hpp).
 pub struct SafePtr<T>
