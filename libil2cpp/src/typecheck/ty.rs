@@ -64,7 +64,7 @@ pub unsafe trait Type: 'static {
     /// always passed by pointer and so implement this by checking
     /// assignability alone, ignoring [`Il2CppType::is_ref`] entirely (see
     /// [`unsafe_impl_reference_type!`](crate::unsafe_impl_reference_type)).
-    /// 
+    ///
     /// A C# *value* type parameter declared `ref`/`out`/`in` is passed by
     /// pointer too, though, so [`ValueType`](crate::ValueType)s also
     /// implement this - but only when `ty.is_ref()` is set, since an
@@ -97,7 +97,7 @@ pub unsafe trait Type: 'static {
     /// assignability check is reversed relative to the argument-side
     /// version because caller and callee swap roles.
     fn matches_reference_parameter(ty: &Il2CppType) -> bool;
-    
+
     /// Whether a *value* of the type can be received as a parameter of the
     /// given [`Il2CppType`] when C# calls into Rust.
     ///

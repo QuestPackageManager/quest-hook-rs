@@ -63,11 +63,12 @@ pub struct BoxedValue<T: ValueType> {
     value: T,
 }
 
-impl<T> From<Gc<BoxedValue<T>>> for Option<T> where
+impl<T> From<Gc<BoxedValue<T>>> for Option<T>
+where
     T: ValueType + Clone,
 {
     fn from(boxed: Gc<BoxedValue<T>>) -> Self {
-        boxed.as_opt().map(|b| b.value.clone())
+        boxed.as_ref().map(|b| b.value.clone())
     }
 }
 
