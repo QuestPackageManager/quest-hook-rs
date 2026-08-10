@@ -26,7 +26,7 @@
 <a href=#26 id=26 data-nosnippet>26</a>    mem::{size_of, transmute},
 <a href=#27 id=27 data-nosnippet>27</a>};
 <a href=#28 id=28 data-nosnippet>28</a>
-<a href=#29 id=29 data-nosnippet>29</a><span class="kw">use </span><span class="kw">crate</span>::ValueType;
+<a href=#29 id=29 data-nosnippet>29</a><span class="kw">use crate</span>::{BoxedValue, Gc, ValueType};
 <a href=#30 id=30 data-nosnippet>30</a>
 <a href=#31 id=31 data-nosnippet>31</a><span class="doccomment">/// Safe wrapper around a raw il2cpp type which can be used in its place
 <a href=#32 id=32 data-nosnippet>32</a>///
@@ -109,20 +109,20 @@
 <a href=#109 id=109 data-nosnippet>109</a>    ptr.read_unaligned()
 <a href=#110 id=110 data-nosnippet>110</a>}
 <a href=#111 id=111 data-nosnippet>111</a>
-<a href=#112 id=112 data-nosnippet>112</a><span class="doccomment">/// Boxes a value type into an [`Il2CppObject`]
+<a href=#112 id=112 data-nosnippet>112</a><span class="doccomment">/// Boxes a value type into a [`BoxedValue&lt;T&gt;`]
 <a href=#113 id=113 data-nosnippet>113</a>/// # Safety
 <a href=#114 id=114 data-nosnippet>114</a>/// The provided value must be a valid value of the given type.
 <a href=#115 id=115 data-nosnippet>115</a>///
 <a href=#116 id=116 data-nosnippet>116</a>/// `Object::Box` (the underlying il2cpp function) allocates memory for the
 <a href=#117 id=117 data-nosnippet>117</a>/// boxed object, so the returned pointer is managed by the il2cpp GC
-<a href=#118 id=118 data-nosnippet>118</a>/// TODO: Return `Gc&lt;Il2CppObject&gt;`
-<a href=#119 id=119 data-nosnippet>119</a></span><span class="attr">#[inline]
-<a href=#120 id=120 data-nosnippet>120</a></span><span class="kw">pub unsafe fn </span>value_box_alloc&lt;T: ValueType&gt;(this: <span class="kw-2">&amp;</span>T) -&gt; <span class="kw-2">*mut </span>Il2CppObject {
-<a href=#121 id=121 data-nosnippet>121</a>    <span class="comment">// TODO: WrapRaw for T?
-<a href=#122 id=122 data-nosnippet>122</a>    </span>functions::value_box(
-<a href=#123 id=123 data-nosnippet>123</a>        T::class().raw() <span class="kw">as </span><span class="kw-2">*const </span>Il2CppClass <span class="kw">as </span><span class="kw-2">*mut </span>Il2CppClass,
-<a href=#124 id=124 data-nosnippet>124</a>        (this <span class="kw">as </span><span class="kw-2">*const </span>T).cast::&lt;c_void&gt;(),
-<a href=#125 id=125 data-nosnippet>125</a>    )
+<a href=#118 id=118 data-nosnippet>118</a></span><span class="attr">#[inline]
+<a href=#119 id=119 data-nosnippet>119</a></span><span class="kw">pub unsafe fn </span>value_box_alloc&lt;T: ValueType&gt;(this: <span class="kw-2">&amp;</span>T) -&gt; Gc&lt;BoxedValue&lt;T&gt;&gt; {
+<a href=#120 id=120 data-nosnippet>120</a>    <span class="comment">// TODO: WrapRaw for T?
+<a href=#121 id=121 data-nosnippet>121</a>    </span><span class="kw">let </span>object = functions::value_box(
+<a href=#122 id=122 data-nosnippet>122</a>        T::class().raw() <span class="kw">as </span><span class="kw-2">*const </span>Il2CppClass <span class="kw">as </span><span class="kw-2">*mut </span>Il2CppClass,
+<a href=#123 id=123 data-nosnippet>123</a>        (this <span class="kw">as </span><span class="kw-2">*const </span>T).cast::&lt;c_void&gt;(),
+<a href=#124 id=124 data-nosnippet>124</a>    );
+<a href=#125 id=125 data-nosnippet>125</a>    object.cast::&lt;BoxedValue&lt;T&gt;&gt;().into()
 <a href=#126 id=126 data-nosnippet>126</a>}
 <a href=#127 id=127 data-nosnippet>127</a>
 <a href=#128 id=128 data-nosnippet>128</a><span class="doccomment">/// Boxes a value type into an [`Il2CppObject`] without allocating or copying,
