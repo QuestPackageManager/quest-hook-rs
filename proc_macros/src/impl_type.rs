@@ -12,6 +12,11 @@ use syn::{
 pub struct Input {
     path: Path,
     ty: Type,
+    /// Name of the field holding the `Il2CppObject` header, e.g. `object` in
+    /// `for List<T>.object`. Only meaningful for [`Semantics::Reference`],
+    /// where - if given - it's used to implement `Deref`/`DerefMut` (and
+    /// thereby `RefType`) for free.
+    object_field: Option<Ident>,
     namespace: String,
     class: String,
     rust_generics: Vec<Type>,
@@ -31,6 +36,13 @@ impl Parse for Input {
         input.parse::<Token![for]>()?;
 
         let mut ty = input.parse()?;
+
+        let object_field = if input.peek(Token![.]) {
+            input.parse::<Token![.]>()?;
+            Some(input.parse()?)
+        } else {
+            None
+        };
 
         input.parse::<Token![=>]>()?;
 
@@ -101,6 +113,7 @@ impl Parse for Input {
         Ok(Self {
             path,
             ty,
+            object_field,
             namespace,
             class,
             rust_generics,
@@ -117,6 +130,10 @@ pub enum Semantics {
 }
 
 pub fn expand(input: &Input, semantics: Semantics) -> TokenStream {
+    if let Err(err) = input.validate(semantics) {
+        return TokenStream::from(err.to_compile_error());
+    }
+
     let header = input.impl_header();
 
     let held = match semantics {
@@ -139,7 +156,7 @@ pub fn expand(input: &Input, semantics: Semantics) -> TokenStream {
     };
 
     let extras = match semantics {
-        Semantics::Reference => None,
+        Semantics::Reference => input.object_field.is_some().then(|| input.reference_extras()),
         Semantics::Value => Some(input.value_extras()),
     };
 
@@ -155,6 +172,17 @@ pub fn expand(input: &Input, semantics: Semantics) -> TokenStream {
 }
 
 impl Input {
+    fn validate(&self, semantics: Semantics) -> Result<()> {
+        match (semantics, &self.object_field) {
+            (Semantics::Value, Some(field)) => Err(Error::new_spanned(
+                field,
+                "unsafe_impl_value_type! does not take an object field name - value types have \
+                 no `Il2CppObject` header",
+            )),
+            _ => Ok(()),
+        }
+    }
+
     fn type_trait(&self) -> TokenStream2 {
         let path = &self.path;
         quote!(#path :: Type)
@@ -252,6 +280,39 @@ impl Input {
             }
             fn matches_reference_parameter(ty: &#type_ty) -> bool {
                 ty.is_ref() && <Self as #type_trait>::class().is_assignable_from(ty.class())
+            }
+        }
+    }
+
+    fn reference_extras(&self) -> TokenStream2 {
+        let ty = &self.ty;
+        let type_trait = self.type_trait();
+        let generics = &self.rust_generics;
+        let path = &self.path;
+        // Only called by `expand` once it's confirmed `object_field` is set.
+        let field = self.object_field.as_ref().unwrap();
+
+        let impl_ = quote!(impl<#(#generics: #type_trait),*>);
+        let type_ = quote!(#ty<#(#generics),*>);
+
+        // `Deref`/`DerefMut` to the embedded `Il2CppObject` header is all
+        // that's needed - the blanket `RefType`/`ObjectExt` impls in
+        // `crate::object` pick this type up automatically from there,
+        // and it also gives autoderef access to `Il2CppObject`'s own
+        // methods (`invoke`, `load`, `store`, ...).
+        quote! {
+            #impl_ ::std::ops::Deref for #type_ {
+                type Target = #path::Il2CppObject;
+
+                fn deref(&self) -> &Self::Target {
+                    &self.#field
+                }
+            }
+
+            #impl_ ::std::ops::DerefMut for #type_ {
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut self.#field
+                }
             }
         }
     }

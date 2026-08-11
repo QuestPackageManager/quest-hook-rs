@@ -91,6 +91,90 @@ pub extern "C" fn load() {
 
 See the [`examples/`](./examples/) directory for more complete examples including custom il2cpp types.
 
+## Memory management
+
+Most APIs in this crate hand back a `Gc<T>` — a thin, `Copy`, nullable pointer to a managed (C#) il2cpp object.
+
+`Gc<T>` is intentionally a **weak** reference. IL2CPP uses the Boehm Garbage Collector, the same one as Mono. The garbage collector only scans memory it knows to be a root (the stack, static fields, a handful of explicitly-registered allocations etc.). This implies that memory outside of the stack, e.g the heap, does not get scanned by the GC and will consequently be cleaned up. Additionally, the GC is not aware of newly created threads (unless we tell it), so a `Gc<T>` sitting in an ordinary Rust variable or struct field is invisible to it. This also means that variables in Rust async are not noticed by the GC.
+
+The GC will periodically scan and destroy objects if nothing else keeps it alive. `Gc<T>` is safe to receive, null-check, and use immediately, but not safe to hold onto. Destroyed objects have no indicators that they've been destroyed, and you will reach a SEGFAULT (usually SEGV_MAPERR).
+
+See more info here [https://www.hboehm.info/ismm/04tutorial.pdf]. 
+
+`NonNullGc<T>` is the same weak pointer with nullability checked out of the type, for when you've already confirmed a `Gc<T>` isn't null and want the compiler to remember that.
+
+`SafePtr<T>` is what actually solves the dangling-pointer problem. It roots the object so it's guaranteed to survive for as long as the `SafePtr<T>` (or any of its clones) exists. It's cheap to `Clone` and safe to hold across collections, store in a struct, or share across threads. Reach for it whenever you need to keep an object alive past the call. It is safe to `Send` and `Sync`, as it is an `Arc` under the hood.
+
+```rust
+use quest_hook::libil2cpp::{Gc, Il2CppObject, SafePtr};
+
+// BAD: a `Gc<T>` stashed in a heap-allocated struct is invisible to the GC.
+struct Cache {
+    target: Gc<Il2CppObject>,
+}
+
+impl Cache {
+    fn new(target: Gc<Il2CppObject>) -> Box<Self> {
+        // `target` is only a root while it sits in this register/stack
+        // slot. Once it's copied into `Cache` and `Cache` is boxed onto
+        // the heap, the GC has no way to find it. Any collection that
+        // runs afterwards - triggered by unrelated allocations elsewhere
+        // in the game, possibly on another thread - is free to reclaim
+        // the object between this line and whenever `self.target` is
+        // next read.
+        Box::new(Self { target })
+    }
+}
+
+// GOOD: root it into a `SafePtr<T>` before it leaves the stack.
+struct SafeCache {
+    target: SafePtr<Il2CppObject>,
+}
+
+impl SafeCache {
+    fn new(target: Gc<Il2CppObject>) -> Box<Self> {
+        Box::new(Self { target: target.into_safe_ptr() })
+    }
+}
+```
+
+## Type system
+
+Every C# type that crosses the Rust/il2cpp boundary — as a hook parameter, return value, method argument, or field — implements `Type`, the trait that tells the library which C# class a Rust type represents (`NAMESPACE`, `CLASS_NAME`) and how to look up its `Il2CppClass`/`Il2CppType`. Built-ins (`Il2CppObject`, `Il2CppString`, the numeric primitives, `Gc<T>`, ...) already implement it; you only need to reach for it yourself when wrapping a C# type that isn't provided out of the box.
+
+C# types come in two shapes, and `Type` alone doesn't say which one a given type is:
+
+- **Reference types** (classes, boxed values, strings) live on the GC heap and are always passed around by pointer — see [Memory management](#memory-management). Wrap them with `unsafe_impl_reference_type!`, which provides the `RefType` and `ObjectExt` extensions for free.
+- **Value types** (structs, enums) are passed by raw bytes/copy, matching C#'s value semantics — unless the C# signature declares the parameter `ref`/`out`/`in`, in which case that particular value is passed by pointer instead. Wrap them with `unsafe_impl_value_type!` and get the `ValueType` extension trait (`invoke`, `invoke_void`, `as_boxed`) for free.
+
+Both macros implement `Type`, plus the lower-level `Argument`/`Parameter`/`Return`/`Returned` traits, for you. All that's required from the struct itself is `#[repr(C)]` with fields laid out to match the real C# type's memory layout.
+
+```rust
+use quest_hook::libil2cpp::{unsafe_impl_reference_type, unsafe_impl_value_type, Il2CppArray, Il2CppObject, Type};
+
+// A C# struct (UnityEngine.Vector3) - passed by value.
+#[derive(Debug)]
+#[repr(C)]
+pub struct Vector3 { x: f32, y: f32, z: f32 }
+unsafe_impl_value_type!(in quest_hook::libil2cpp for Vector3 => UnityEngine.Vector3);
+
+// A C# class (System.Collections.Generic.List<T>) - passed by pointer/Gc<T>.
+// Its layout mirrors the real List<T> object: an Il2CppObject header
+// followed by its fields, and the Rust generic `T` maps onto C#'s generic
+// parameter.
+#[repr(C)]
+pub struct List<T: Type> {
+    object: Il2CppObject,
+    items: *mut Il2CppArray<T>,
+    size: i32,
+}
+unsafe_impl_reference_type!(in quest_hook::libil2cpp for List<T>.object => System.Collections.Generic.List<T>);
+```
+
+Once a type implements `Type`, it can be used directly as a `#[hook]` parameter/return type (see [Example](#example)) or passed to `invoke`/`invoke_void`. At each call site the library checks it against the target method's real C# signature — via the `Argument`/`Parameter`/`Return`/`Returned` traits, implemented automatically by the macros above — and panics on a mismatch rather than silently misinterpreting the bytes.
+
+See the [`custom_type`](./examples/custom_type.rs) example for both macros used together in a hook.
+
 ## Cargo features
 
 | Feature | Default | Description |
@@ -123,7 +207,7 @@ Contributions are welcome, especially to the documentation and examples. Most of
 
 Everything that can reasonably be done in Rust should be done in Rust. This library is, by nature, extremely unsafe and contains a lot of unsafe code — the goal is a Rust-friendly API surface, not the elimination of unsafety.
 
-A decent understanding of both Rust and C++ is required for most contributions. The main reference is the libil2cpp source. Another useful reference is [beatsaber-hook](https://github.com/sc2ad/beatsaber-hook).
+A decent understanding of both Rust and C++ is required for most contributions. The main reference is the libil2cpp source. Another useful reference is [beatsaber-hook](https://github.com/QuestPackageManager/beatsaber-hook).
 
 ## License
 

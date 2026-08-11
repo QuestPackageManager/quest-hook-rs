@@ -121,14 +121,25 @@ pub fn hook(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Note that in order to use this macros, the `generic_associated_types`
 /// feature must be enabled.
 ///
+/// The Rust type can optionally name the field holding its `Il2CppObject`
+/// header right after the type, separated by a `.` (e.g. `for
+/// GameObject.object`). When given, that field is used to implement
+/// `Deref`/`DerefMut` to `Il2CppObject`, which in turn is what makes the type
+/// pick up the blanket `RefType`/`ObjectExt` impls (giving it
+/// `as_object`/`as_object_mut`/`new`, and autoderef access to
+/// `Il2CppObject`'s own methods like `invoke`) for free. Leave it off for
+/// reference types that aren't a plain struct with an `Il2CppObject` field -
+/// e.g. ones that provide `Deref`/`DerefMut` some other way - and implement
+/// `RefType` (or the traits it's derived from) by hand instead.
+///
 /// # Safety
 ///
 /// The type must hold the guarantees required by the `Type` trait.
 ///
 /// # Examples
 ///
-/// The basic syntax follows the pattern `in <libil2cpp path> for <Rust type> =>
-/// <C# type>`.
+/// The basic syntax follows the pattern `in <libil2cpp path> for <Rust type>
+/// [.<object field>] => <C# type>`.
 ///
 /// ```ignore
 /// #![feature(generic_associated_types)]
@@ -140,7 +151,7 @@ pub fn hook(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     object: Il2CppObject,
 /// }
 ///
-/// unsafe_impl_reference_type!(in libil2cpp for GameObject => UnityEngine.GameObject);
+/// unsafe_impl_reference_type!(in libil2cpp for GameObject.object => UnityEngine.GameObject);
 /// ```
 ///
 /// It's also possible to use this macro with generic types. In this scenario,
@@ -158,7 +169,7 @@ pub fn hook(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     size: i32,
 /// }
 ///
-/// unsafe_impl_reference_type!(in libil2cpp for List<T> => System.Collections.Generic.List<T>);
+/// unsafe_impl_reference_type!(in libil2cpp for List<T>.object => System.Collections.Generic.List<T>);
 /// ```
 ///
 /// A class getter can be provided manually.
@@ -173,7 +184,7 @@ pub fn hook(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     object: Il2CppObject,
 /// }
 ///
-/// unsafe_impl_reference_type!(in libil2cpp for MyClass => MyNamespace.MyClass {
+/// unsafe_impl_reference_type!(in libil2cpp for MyClass.object => MyNamespace.MyClass {
 ///     my_class_getter()
 /// });
 ///
@@ -196,7 +207,7 @@ pub fn hook(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     size: i32,
 /// }
 ///
-/// unsafe_impl_reference_type!(in libil2cpp for List<T> => "System.Collections.Generic"."List`1"<T>);
+/// unsafe_impl_reference_type!(in libil2cpp for List<T>.object => "System.Collections.Generic"."List`1"<T>);
 /// ```
 #[proc_macro]
 pub fn unsafe_impl_reference_type(input: TokenStream) -> TokenStream {
