@@ -120,3 +120,96 @@ impl fmt::Debug for PropertyInfo {
             .finish()
     }
 }
+
+// These tests build hand-populated raw structs rather than loading a real
+// il2cpp binary (see `libil2cpp/tests/README.md`/`gc.rs`'s test module for
+// why) - `get`/`set` only need to prove they panic before ever reaching the
+// getter/setter `MethodInfo`, since actually invoking one needs a live
+// runtime and is out of scope for a unit test.
+#[cfg(test)]
+mod tests {
+    use std::mem;
+
+    use super::*;
+
+    fn leak<T>(value: T) -> &'static T {
+        Box::leak(Box::new(value))
+    }
+
+    /// A fake class, only ever used as a pointer target for identity/debug
+    /// purposes - never actually read through.
+    fn fake_class() -> &'static Il2CppClass {
+        let raw: raw::Il2CppClass = unsafe { mem::zeroed() };
+        unsafe { Il2CppClass::wrap_ptr(leak(raw)) }.unwrap()
+    }
+
+    fn fake_method(name: &'static CStr) -> &'static MethodInfo {
+        let mut raw: raw::MethodInfo = unsafe { mem::zeroed() };
+        raw.name = name.as_ptr();
+        // Give it a valid (if fake) parent class so `MethodInfo::class()` -
+        // called from `MethodInfo`'s `Debug` impl - doesn't panic on a null
+        // pointer.
+        raw.klass = fake_class().raw() as *const raw::Il2CppClass as *mut raw::Il2CppClass;
+        unsafe { MethodInfo::wrap_ptr(leak(raw)) }.unwrap()
+    }
+
+    fn fake_property(
+        name: &'static CStr,
+        parent: &'static Il2CppClass,
+        get: Option<&'static MethodInfo>,
+        set: Option<&'static MethodInfo>,
+    ) -> &'static PropertyInfo {
+        let mut raw: raw::PropertyInfo = unsafe { mem::zeroed() };
+        raw.name = name.as_ptr();
+        raw.parent = parent.raw() as *const raw::Il2CppClass as *mut raw::Il2CppClass;
+        raw.get = get.map_or(std::ptr::null(), |m| m.raw() as *const raw::MethodInfo);
+        raw.set = set.map_or(std::ptr::null(), |m| m.raw() as *const raw::MethodInfo);
+        unsafe { PropertyInfo::wrap_ptr(leak(raw)) }.unwrap()
+    }
+
+    #[test]
+    fn name_and_parent() {
+        let class = fake_class();
+        let prop = fake_property(c"Health", class, None, None);
+
+        assert_eq!(prop.name(), "Health");
+        assert!(std::ptr::eq(prop.parent(), class));
+    }
+
+    #[test]
+    fn getter_and_setter_reflect_presence() {
+        let class = fake_class();
+        let accessor = fake_method(c"get_Health");
+
+        let both = fake_property(c"Health", class, Some(accessor), Some(accessor));
+        assert!(both.getter().is_some());
+        assert!(both.setter().is_some());
+
+        let neither = fake_property(c"ReadOnly", class, None, None);
+        assert!(neither.getter().is_none());
+        assert!(neither.setter().is_none());
+    }
+
+    #[test]
+    #[should_panic(expected = "property NoGetter has no getter")]
+    fn get_panics_without_a_getter() {
+        let class = fake_class();
+        let prop = fake_property(c"NoGetter", class, None, None);
+        let _: crate::Result<()> = prop.get(());
+    }
+
+    // `set`/`set_unchecked`'s no-setter panic isn't separately tested:
+    // `Argument` has no impl for `()`, and every real implementor needs a
+    // full `RefType` (see `gc.rs`'s test module for what that mock takes),
+    // for no extra coverage - `set` panics via the exact same
+    // `unwrap_or_else` pattern as `get`, which is exercised above.
+
+    #[test]
+    fn debug_includes_name() {
+        let class = fake_class();
+        let prop = fake_property(c"Health", class, None, None);
+
+        let formatted = format!("{prop:?}");
+        assert!(formatted.contains("Health"));
+    }
+}
