@@ -82,8 +82,9 @@ where
     /// can fail ([`Err`]) if it isn't really (assignable to) a `U`. Compare
     /// [`type_cast`](Gc::type_cast), which trusts a compile-time
     /// relationship instead of checking and never fails.
-    /// 
-    /// If the [`Gc<T>`] is null, this will return a null [`Gc<U>`] regardless of the type relationship.
+    ///
+    /// If the [`Gc<T>`] is null, this will return a null [`Gc<U>`] regardless
+    /// of the type relationship.
     ///
     /// C++ Implementation
     /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/2604126ec26dd807da0be0ad974056d1f5fe9575/shared/utils/il2cpp-utils-classes.hpp#L185-L212>

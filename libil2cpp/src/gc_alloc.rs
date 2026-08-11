@@ -113,12 +113,12 @@ where
     /// Casts `T` to `U` using compiler-checked type conversion, which will fail
     /// to compile if `T` is not convertible to `U`. This is a compile-time
     /// checked cast, and will not perform any runtime checks.
-    /// 
-    /// See [`cast`](SafePtr::<T>::cast) for a runtime-checked cast that can fail at
-    /// runtime.
-    /// 
+    ///
+    /// See [`cast`](SafePtr::<T>::cast) for a runtime-checked cast that can
+    /// fail at runtime.
+    ///
     /// Cannot be null, since `SafePtr<T>` is never null (see [`SafePtr::new`]).
-    /// 
+    ///
     /// See [`Gc::type_cast`] for more details.
     pub fn type_cast<U>(&self) -> SafePtr<U>
     where
@@ -131,15 +131,16 @@ where
     /// Casts `T` to `U`, checked against the object's actual runtime class -
     /// see [`Gc::cast`], which this calls before re-rooting the result
     /// in a new [`SafePtr<U>`].
-    /// 
-    /// This cannot be null, since [`SafePtr<T>`] is never null (see [`SafePtr::new`]).
+    ///
+    /// This cannot be null, since [`SafePtr<T>`] is never null (see
+    /// [`SafePtr::new`]).
     ///
     /// # Safety
     /// This function is safe to call, but the caller must ensure that the
     /// [`Gc<T>`] is valid and points to a valid object of type `T`.
     ///  If the [`Gc<T>`] points to an invalid object, this function
-    /// may cause undefined behavior. 
-    /// 
+    /// may cause undefined behavior.
+    ///
     /// See [`Gc::cast`].
     pub fn cast<U>(&self) -> Result<SafePtr<U>, String>
     where
