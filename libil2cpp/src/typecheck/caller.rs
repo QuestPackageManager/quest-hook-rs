@@ -4,7 +4,7 @@ use std::mem::transmute;
 use std::ptr::null_mut;
 
 use crate::byref::{ByRef, ReffableType};
-use crate::{Builtin, Gc, Il2CppObject, Il2CppType, MethodInfo, Type};
+use crate::{Builtin, Gc, Il2CppObject, Il2CppType, MethodInfo, RefType, Type};
 
 /// Trait implemented by types that can be used as a C# `this` arguments
 ///
@@ -119,7 +119,7 @@ where
 }
 unsafe impl<T> ThisArgument for Gc<T>
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     type Type = T;
 
@@ -177,7 +177,7 @@ unsafe impl ThisArgument for () {
 #[rustfmt::skip]
 unsafe impl<T> Argument for Option<&mut T>
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     type Type = T;
 
@@ -193,7 +193,7 @@ where
 #[rustfmt::skip]
 unsafe impl<T> Argument for *mut T
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     type Type = T;
 
@@ -210,7 +210,7 @@ where
 #[rustfmt::skip]
 unsafe impl<T> Argument for &mut T
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     type Type = T;
 
@@ -226,7 +226,7 @@ where
 #[rustfmt::skip]
 unsafe impl<T> Argument for Gc<T>
 where 
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 
 {
     type Type = T;
@@ -256,7 +256,7 @@ where
 
     fn invokable(&mut self) -> *mut c_void {
         unsafe { transmute((self as *mut Self).read()) }
-        
+
     }
 }
 
@@ -264,7 +264,7 @@ where
 #[rustfmt::skip]
 unsafe impl<T> Returned for Option<&mut T>
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     type Type = T;
 
@@ -279,7 +279,7 @@ where
 #[rustfmt::skip]
 unsafe impl<T> Returned for Gc<T>
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     type Type = T;
 
@@ -309,7 +309,7 @@ where T: ReffableType,
 #[rustfmt::skip]
 unsafe impl<T> Returned for *mut T
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 
 {
     type Type = T;
@@ -327,7 +327,7 @@ where
 #[rustfmt::skip]
 unsafe impl<T> Returned for Option<&T>
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     type Type = T;
 
@@ -342,7 +342,7 @@ where
 #[rustfmt::skip]
 unsafe impl<T> Returned for *const T
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     type Type = T;
 
@@ -359,7 +359,7 @@ where
 #[rustfmt::skip]
 unsafe impl<T> Returned for &mut T
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     type Type = T;
 
@@ -376,7 +376,7 @@ where
 #[rustfmt::skip]
 unsafe impl<T> Returned for &T
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     type Type = T;
 

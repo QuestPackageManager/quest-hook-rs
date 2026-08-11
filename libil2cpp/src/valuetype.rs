@@ -1,7 +1,7 @@
 use std::fmt::{self, Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 
-use crate::{Arguments, Gc, Il2CppObject, Returned, Type};
+use crate::{Arguments, Gc, Il2CppObject, RefType, Returned, Type};
 
 /// Extension trait for value types providing additional functionality
 pub trait ValueType: for<'a> Type<Held<'a> = Self> + Sized {
@@ -92,6 +92,20 @@ impl<T: ValueType> Deref for BoxedValue<T> {
 impl<T: ValueType> DerefMut for BoxedValue<T> {
     fn deref_mut(&mut self) -> &mut T {
         &mut self.value
+    }
+}
+
+// `BoxedValue<T>` derefs to its wrapped `T` (above), not to `Il2CppObject`,
+// so it doesn't pick up `RefType` from the blanket impl the way most
+// reference types do - implemented directly instead, straight off the
+// `header` field its layout guarantees.
+impl<T: ValueType> RefType for BoxedValue<T> {
+    fn as_object(&self) -> &Il2CppObject {
+        &self.header
+    }
+
+    fn as_object_mut(&mut self) -> &mut Il2CppObject {
+        &mut self.header
     }
 }
 

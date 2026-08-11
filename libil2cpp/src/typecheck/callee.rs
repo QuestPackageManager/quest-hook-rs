@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::byref::ReffableType;
-use crate::{Builtin, ByRef, Gc, Il2CppType, MethodInfo, Type};
+use crate::{Builtin, ByRef, Gc, Il2CppType, MethodInfo, RefType, Type};
 
 /// Trait implemented by types that can be used as C# `this` method parameters
 ///
@@ -159,7 +159,7 @@ unsafe impl ThisParameter for () {
 #[rustfmt::skip]
 unsafe impl<T> Parameter for Option<&mut T>
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     type Actual = Self;
 
@@ -177,7 +177,7 @@ where
 #[rustfmt::skip]
 unsafe impl<T> Parameter for *mut T
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     type Actual = Self;
 
@@ -197,7 +197,7 @@ where
 #[rustfmt::skip]
 unsafe impl<T> Parameter for &mut T
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     type Actual = Option<Self>;
 
@@ -216,7 +216,7 @@ where
 #[rustfmt::skip]
 unsafe impl<T> ThisParameter for Gc<T>
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     type Actual = Self;
 
@@ -254,7 +254,7 @@ where
 #[rustfmt::skip]
 unsafe impl<T> Parameter for Gc<T>
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     type Actual = Self;
 
@@ -291,7 +291,7 @@ where T: ReffableType,
 #[rustfmt::skip]
 unsafe impl<T> Return for Gc<T>
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     type Actual = Self;
 
@@ -329,7 +329,7 @@ where T: ReffableType
 #[rustfmt::skip]
 unsafe impl<T> Return for Option<&mut T>
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     type Actual = Self;
 
@@ -347,7 +347,7 @@ where
 #[rustfmt::skip]
 unsafe impl<T> Return for *mut T
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     type Actual = Self;
 
@@ -367,7 +367,7 @@ where
 #[rustfmt::skip]
 unsafe impl<T> Return for &mut T
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     type Actual = Option<Self>;
 
