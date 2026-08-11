@@ -70,9 +70,10 @@
 <a href=#70 id=70 data-nosnippet>70</a>/// rather than a callable wrapper - it's meant for xref use, where a known
 <a href=#71 id=71 data-nosnippet>71</a>/// symbol is used as a disassembly starting point to locate a function that
 <a href=#72 id=72 data-nosnippet>72</a>/// isn't itself exported.
-<a href=#73 id=73 data-nosnippet>73</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>symbol_addr(name: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Option</span>&lt;usize&gt; {
-<a href=#74 id=74 data-nosnippet>74</a>    <span class="kw">unsafe </span>{ LIBIL2CPP.get::&lt;<span class="kw-2">*const </span>()&gt;(name) }
-<a href=#75 id=75 data-nosnippet>75</a>        .ok()
-<a href=#76 id=76 data-nosnippet>76</a>        .map(|sym| <span class="kw-2">*</span>sym <span class="kw">as </span>usize)
-<a href=#77 id=77 data-nosnippet>77</a>}
+<a href=#73 id=73 data-nosnippet>73</a></span><span class="attr">#[allow(unused)]
+<a href=#74 id=74 data-nosnippet>74</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>symbol_addr(name: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Option</span>&lt;usize&gt; {
+<a href=#75 id=75 data-nosnippet>75</a>    <span class="kw">unsafe </span>{ LIBIL2CPP.get::&lt;<span class="kw-2">*const </span>()&gt;(name) }
+<a href=#76 id=76 data-nosnippet>76</a>        .ok()
+<a href=#77 id=77 data-nosnippet>77</a>        .map(|sym| <span class="kw-2">*</span>sym <span class="kw">as </span>usize)
+<a href=#78 id=78 data-nosnippet>78</a>}
 </code></pre></div></section></main></body></html>
