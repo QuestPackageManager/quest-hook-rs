@@ -249,8 +249,7 @@ impl Il2CppClass {
             let info = FindMethodParameters {
                 ty_name: self.to_string(),
                 method_name: name.to_string(),
-                // TODO!
-                parameters: vec![format!("UNABLE TO PROVIDE! Count! {N}")],
+                    parameters: arg_classes.iter().map(|c| c.to_string()).collect(),
             };
             return Err(FindMethodError::None(info));
         };
