@@ -385,6 +385,70 @@ impl Il2CppClass {
         Err(FindMethodError::None(info))
     }
 
+    /// Find a method declared directly on this class (not its parents) by
+    /// its vtable slot
+    ///
+    /// Unlike [`find_method`](Self::find_method) and friends, this does not
+    /// walk the class hierarchy - a vtable slot only makes sense relative to
+    /// the exact class that declares the method at that slot.
+    pub fn find_method_by_slot(&self, slot: u16) -> Option<&'static MethodInfo> {
+        self.methods().iter().find(|mi| mi.slot() == slot).copied()
+    }
+
+    /// Resolves the method that `self` (as an instance of some concrete
+    /// type) actually runs for the virtual/interface method declared at
+    /// `slot` in `declaring_class`, following the vtable the same way a
+    /// real virtual/interface call would
+    ///
+    /// `declaring_class` is typically a base class or interface further up
+    /// `self`'s hierarchy - this is the mechanism generated hooks use to
+    /// hook a specific override without knowing its (possibly obfuscated)
+    /// name.
+    pub fn find_method_by_vtable(
+        &self,
+        declaring_class: &Self,
+        slot: u16,
+    ) -> Option<&'static MethodInfo> {
+        // concrete type
+        if !declaring_class.is_interface() {
+            let entry = self.vtable().get(slot as usize)?;
+            let method = unsafe { MethodInfo::wrap_ptr(entry.method) }?;
+
+            // A vtable entry can point at a MethodInfo with a different
+            // slot for abstract methods with no direct implementation -
+            // fall back to a plain slot search in that case.
+            if method.slot() != slot {
+                return self.find_method_by_slot(slot);
+            }
+
+            return Some(method);
+        }
+
+        // `declaring_class` is an interface: find where its vtable is
+        // spliced into `self`'s vtable.
+        for pair in self.interface_offsets() {
+            let interface_t = unsafe { Self::wrap_ptr(pair.interfaceType) };
+            if interface_t == Some(declaring_class) {
+                // The interface's vtable is spliced into `self`'s vtable at the
+                // given offset, so the method at `slot` in the interface is
+                // at `offset + slot` in `self`'s vtable.
+                let index = pair.offset as usize + slot as usize;
+                return self
+                    .vtable()
+                    .get(index)
+                    .and_then(|entry| unsafe { MethodInfo::wrap_ptr(entry.method) });
+            }
+        }
+
+        // `self` might be the interface itself, in which case its own
+        // `methods` array (not the vtable) is what's indexed by slot.
+        if self.is_interface() {
+            return self.methods().get(slot as usize).copied();
+        }
+
+        None
+    }
+
     /// Find a field belonging to the class or its parents by name
     #[crate::instrument(level = "debug")]
     pub fn find_field(&self, name: &str) -> Option<&FieldInfo> {
@@ -566,6 +630,28 @@ impl Il2CppClass {
         unsafe { raw::class_is_assignable_from(self.raw(), other.raw()) }
     }
 
+    /// Whether this class represents a C# interface
+    pub fn is_interface(&self) -> bool {
+        self.raw().flags & raw::TYPE_ATTRIBUTE_INTERFACE != 0
+    }
+
+    /// This class' vtable, indexed by [`MethodInfo::slot`]
+    fn vtable(&self) -> &[raw::VirtualInvokeData] {
+        let raw = self.raw();
+        unsafe { raw.vtable.as_slice(raw.vtable_count as _) }
+    }
+
+    /// Offsets of each interface this class implements into [`Self::vtable`]
+    fn interface_offsets(&self) -> &[raw::Il2CppRuntimeInterfaceOffsetPair] {
+        let raw = self.raw();
+        let offsets = raw.interfaceOffsets;
+        if !offsets.is_null() {
+            unsafe { slice::from_raw_parts(offsets, raw.interface_offsets_count as _) }
+        } else {
+            &[]
+        }
+    }
+
     /// [`Il2CppType`] of `this` for the class
     pub fn this_arg_ty(&self) -> &Il2CppType {
         unsafe { Il2CppType::wrap(&self.raw().this_arg) }
@@ -729,5 +815,211 @@ impl Display for FindMethodParameters {
             self.method_name,
             self.parameters.join(", ")
         )
+    }
+}
+
+// These tests build hand-populated raw structs (leaked for a `'static`
+// lifetime) rather than loading a real il2cpp binary
+#[cfg(test)]
+mod tests {
+    use std::mem;
+
+    use super::*;
+
+    fn leak<T>(value: T) -> &'static T {
+        Box::leak(Box::new(value))
+    }
+
+    fn leak_slice<T>(items: Vec<T>) -> &'static [T] {
+        Box::leak(items.into_boxed_slice())
+    }
+
+    fn fake_method(name: &'static CStr, slot: u16) -> &'static MethodInfo {
+        let mut raw: raw::MethodInfo = unsafe { mem::zeroed() };
+        raw.name = name.as_ptr();
+        raw.slot = slot;
+        unsafe { MethodInfo::wrap_ptr(leak(raw)) }.unwrap()
+    }
+
+    fn fake_property(name: &'static CStr) -> raw::PropertyInfo {
+        let mut raw: raw::PropertyInfo = unsafe { mem::zeroed() };
+        raw.name = name.as_ptr();
+        raw
+    }
+
+    fn fake_interface_offset(
+        interface: &'static Il2CppClass,
+        offset: i32,
+    ) -> raw::Il2CppRuntimeInterfaceOffsetPair {
+        raw::Il2CppRuntimeInterfaceOffsetPair {
+            interfaceType: interface.raw() as *const raw::Il2CppClass as *mut raw::Il2CppClass,
+            offset,
+        }
+    }
+
+    fn vtable_entry(method: &'static MethodInfo) -> raw::VirtualInvokeData {
+        let mut entry: raw::VirtualInvokeData = unsafe { mem::zeroed() };
+        entry.method = method.raw() as *const raw::MethodInfo;
+        entry
+    }
+
+    fn zero_vtable_entry() -> raw::VirtualInvokeData {
+        unsafe { mem::zeroed() }
+    }
+
+    /// Builds a leaked fake class with the given metadata, including a
+    /// trailing vtable spliced directly after the `Il2CppClass` header -
+    /// `Il2CppClass::vtable` is a C flexible array member (zero-sized on
+    /// the Rust side), so a `#[repr(C)]` wrapper struct with a fixed-size
+    /// trailing array reproduces the same layout real il2cpp allocates.
+    fn fake_class_with_vtable<const N: usize>(
+        flags: u32,
+        parent: Option<&'static Il2CppClass>,
+        methods: &'static [*const raw::MethodInfo],
+        properties: &'static [raw::PropertyInfo],
+        interface_offsets: &'static [raw::Il2CppRuntimeInterfaceOffsetPair],
+        vtable: [raw::VirtualInvokeData; N],
+    ) -> &'static Il2CppClass {
+        #[repr(C)]
+        struct WithVtable<const N: usize> {
+            class: raw::Il2CppClass,
+            vtable: [raw::VirtualInvokeData; N],
+        }
+
+        let mut class: raw::Il2CppClass = unsafe { mem::zeroed() };
+        class.flags = flags;
+        class.parent = match parent {
+            Some(p) => p.raw() as *const raw::Il2CppClass as *mut raw::Il2CppClass,
+            None => ptr::null_mut(),
+        };
+        class.methods = methods.as_ptr().cast_mut();
+        class.method_count = methods.len() as u16;
+        class.properties = properties.as_ptr();
+        class.property_count = properties.len() as u16;
+        class.interfaceOffsets = interface_offsets.as_ptr().cast_mut();
+        class.interface_offsets_count = interface_offsets.len() as u16;
+        class.vtable_count = N as u16;
+
+        let leaked = leak(WithVtable { class, vtable });
+        unsafe { Il2CppClass::wrap_ptr(&leaked.class) }.unwrap()
+    }
+
+    fn fake_class(flags: u32) -> &'static Il2CppClass {
+        fake_class_with_vtable(flags, None, &[], &[], &[], [])
+    }
+
+    #[test]
+    fn is_interface_reflects_type_attribute_interface_flag() {
+        assert!(!fake_class(0).is_interface());
+        assert!(fake_class(raw::TYPE_ATTRIBUTE_INTERFACE).is_interface());
+    }
+
+    #[test]
+    fn properties_empty_when_class_has_none() {
+        let class = fake_class(0);
+        assert!(class.properties().is_empty());
+        assert!(class.find_property("Missing").is_none());
+    }
+
+    #[test]
+    fn find_property_walks_hierarchy() {
+        let base_props = leak_slice(vec![fake_property(c"Health")]);
+        let base = fake_class_with_vtable(0, None, &[], base_props, &[], []);
+        let derived = fake_class_with_vtable(0, Some(base), &[], &[], &[], []);
+
+        assert_eq!(derived.find_property("Health").unwrap().name(), "Health");
+        assert!(derived.find_property("Missing").is_none());
+    }
+
+    #[test]
+    fn find_method_by_slot_does_not_walk_hierarchy() {
+        let base_methods = leak_slice(vec![fake_method(c"BaseOnly", 5).raw() as *const _]);
+        let base = fake_class_with_vtable(0, None, base_methods, &[], &[], []);
+
+        let derived_methods = leak_slice(vec![fake_method(c"Derived", 2).raw() as *const _]);
+        let derived = fake_class_with_vtable(0, Some(base), derived_methods, &[], &[], []);
+
+        assert_eq!(derived.find_method_by_slot(2).unwrap().name(), "Derived");
+        // Slot 5 only exists on the parent - `find_method_by_slot` must
+        // NOT walk the hierarchy the way `find_method`/`find_field` do.
+        assert!(derived.find_method_by_slot(5).is_none());
+        assert_eq!(base.find_method_by_slot(5).unwrap().name(), "BaseOnly");
+    }
+
+    #[test]
+    fn find_method_by_vtable_non_interface_direct_match() {
+        let m0 = fake_method(c"M0", 0);
+        let m1 = fake_method(c"M1", 1);
+        let declaring = fake_class(0);
+        let class =
+            fake_class_with_vtable(0, None, &[], &[], &[], [vtable_entry(m0), vtable_entry(m1)]);
+
+        let found = class.find_method_by_vtable(declaring, 1).unwrap();
+        assert_eq!(found.name(), "M1");
+    }
+
+    #[test]
+    fn find_method_by_vtable_non_interface_falls_back_on_slot_mismatch() {
+        // Simulates an abstract method: the vtable entry at slot 0 points
+        // at a `MethodInfo` whose own `slot` doesn't match, so resolution
+        // should fall back to a direct slot search over `self`'s methods.
+        let stale = fake_method(c"Stale", 99);
+        let real = fake_method(c"RealImpl", 0);
+
+        let declaring = fake_class(0);
+        let methods = leak_slice(vec![real.raw() as *const _]);
+        let class = fake_class_with_vtable(0, None, methods, &[], &[], [vtable_entry(stale)]);
+
+        let found = class.find_method_by_vtable(declaring, 0).unwrap();
+        assert_eq!(found.name(), "RealImpl");
+    }
+
+    #[test]
+    fn find_method_by_vtable_interface_uses_interface_offsets() {
+        let iface = fake_class(raw::TYPE_ATTRIBUTE_INTERFACE);
+
+        let impl0 = fake_method(c"Impl0", 10);
+        let impl1 = fake_method(c"Impl1", 11);
+        // The interface's methods are spliced in starting at vtable index
+        // 3 - slots 0..3 belong to the concrete class's own methods.
+        let offsets = leak_slice(vec![fake_interface_offset(iface, 3)]);
+        let vtable = [
+            zero_vtable_entry(),
+            zero_vtable_entry(),
+            zero_vtable_entry(),
+            vtable_entry(impl0),
+            vtable_entry(impl1),
+        ];
+        let class = fake_class_with_vtable(0, None, &[], &[], offsets, vtable);
+
+        let found = class.find_method_by_vtable(iface, 1).unwrap();
+        assert_eq!(found.name(), "Impl1");
+    }
+
+    #[test]
+    fn find_method_by_vtable_falls_back_to_own_methods_when_self_is_the_interface() {
+        let other_iface = fake_class(raw::TYPE_ATTRIBUTE_INTERFACE);
+
+        let m0 = fake_method(c"M0", 0);
+        let m1 = fake_method(c"M1", 1);
+        let methods = leak_slice(vec![m0.raw() as *const _, m1.raw() as *const _]);
+
+        // `self` IS the interface, and doesn't implement `other_iface`, so
+        // resolution should fall back to indexing `self.methods()`
+        // directly by slot rather than going through the (nonexistent for
+        // an interface) vtable splice.
+        let self_iface =
+            fake_class_with_vtable(raw::TYPE_ATTRIBUTE_INTERFACE, None, methods, &[], &[], []);
+
+        let found = self_iface.find_method_by_vtable(other_iface, 1).unwrap();
+        assert_eq!(found.name(), "M1");
+    }
+
+    #[test]
+    fn find_method_by_vtable_returns_none_when_not_implemented() {
+        let iface = fake_class(raw::TYPE_ATTRIBUTE_INTERFACE);
+        let class = fake_class(0); // implements nothing
+
+        assert!(class.find_method_by_vtable(iface, 0).is_none());
     }
 }

@@ -143,6 +143,11 @@ impl MethodInfo {
     pub fn is_generic(&self) -> bool {
         unsafe { raw::method_is_generic(self.raw()) }
     }
+
+    /// The method's vtable slot
+    pub fn slot(&self) -> u16 {
+        self.raw().slot
+    }
 }
 
 unsafe impl WrapRaw for MethodInfo {
