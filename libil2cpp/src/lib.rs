@@ -106,6 +106,7 @@ mod field_info;
 mod gc;
 mod method_info;
 mod object;
+mod property_info;
 mod valuetype;
 #[cfg(feature = "xref")]
 mod xref;
@@ -137,6 +138,7 @@ pub use field_info::FieldInfo;
 pub use method_info::{Il2CppReflectionMethod, MethodInfo, Result, Void};
 pub use object::{Il2CppObject, ObjectExt, RefType};
 pub use parameter_info::ParameterInfo;
+pub use property_info::PropertyInfo;
 pub use raw::{unbox, value_box_alloc, WrapRaw, IL2CPP_BINARY};
 pub use string::Il2CppString;
 pub use ty::{Builtin, Il2CppReflectionType, Il2CppType};

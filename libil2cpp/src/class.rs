@@ -6,7 +6,7 @@ use std::{fmt, ptr, slice, vec};
 
 use crate::{
     raw, Arguments, FieldInfo, Gc, Generics, Il2CppException, Il2CppType, MethodInfo, Parameters,
-    Return, Returned, ThisParameter, Type, WrapRaw,
+    PropertyInfo, Return, Returned, ThisParameter, Type, WrapRaw,
 };
 
 #[cfg(feature = "il2cpp_v31")]
@@ -17,6 +17,15 @@ type FieldInfoSlice<'a> = &'a [FieldInfo];
 type FieldInfoSlice<'a> = &'a [FieldInfo];
 #[cfg(feature = "unity2018")]
 type FieldInfoSlice<'a> = &'a [&'static FieldInfo];
+
+#[cfg(feature = "il2cpp_v31")]
+type PropertyInfoSlice<'a> = &'a [PropertyInfo];
+#[cfg(feature = "il2cpp_v29")]
+type PropertyInfoSlice<'a> = &'a [PropertyInfo];
+#[cfg(feature = "il2cpp_v24")]
+type PropertyInfoSlice<'a> = &'a [PropertyInfo];
+#[cfg(feature = "unity2018")]
+type PropertyInfoSlice<'a> = &'a [&'static PropertyInfo];
 
 /// An il2cpp class
 #[repr(transparent)]
@@ -392,6 +401,22 @@ impl Il2CppClass {
         None
     }
 
+    /// Find a property belonging to the class or its parents by name
+    #[crate::instrument(level = "debug")]
+    pub fn find_property(&self, name: &str) -> Option<&PropertyInfo> {
+        for c in self.hierarchy() {
+            let mut matching = c.properties().iter().filter(|pi| pi.name() == name);
+
+            match matching.next() {
+                // If we have no matches, we continue to the parent
+                None => continue,
+                Some(pi) => return Some(pi),
+            }
+        }
+
+        None
+    }
+
     /// Instanciates a generic class template with the provided generic
     /// arguments
     pub fn make_generic<G>(&self) -> Result<Option<&'static Self>, Gc<Il2CppException>>
@@ -486,6 +511,17 @@ impl Il2CppClass {
         let fields = raw.fields;
         if !fields.is_null() {
             unsafe { slice::from_raw_parts(fields as _, raw.field_count as _) }
+        } else {
+            &[]
+        }
+    }
+
+    /// Properties of the class
+    pub fn properties(&self) -> PropertyInfoSlice<'_> {
+        let raw = self.raw();
+        let properties = raw.properties;
+        if !properties.is_null() {
+            unsafe { slice::from_raw_parts(properties.cast(), raw.property_count as _) }
         } else {
             &[]
         }
