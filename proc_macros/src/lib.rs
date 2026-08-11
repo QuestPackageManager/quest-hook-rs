@@ -222,8 +222,9 @@ pub fn unsafe_impl_reference_type(input: TokenStream) -> TokenStream {
 /// `once_cell` features must be enabled.
 ///
 /// This macro works the same way as [`unsafe_impl_reference_type!`], except
-/// that it is meant for value types and implements some extra traits not
-/// covered by blanket impls.
+/// that it is meant for value types, never takes an object field name (value
+/// types have no `Il2CppObject` header), and implements some extra traits
+/// not covered by blanket impls.
 ///
 /// # Safety
 ///

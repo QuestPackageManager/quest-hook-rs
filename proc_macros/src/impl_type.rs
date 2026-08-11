@@ -156,7 +156,10 @@ pub fn expand(input: &Input, semantics: Semantics) -> TokenStream {
     };
 
     let extras = match semantics {
-        Semantics::Reference => input.object_field.is_some().then(|| input.reference_extras()),
+        Semantics::Reference => input
+            .object_field
+            .is_some()
+            .then(|| input.reference_extras()),
         Semantics::Value => Some(input.value_extras()),
     };
 

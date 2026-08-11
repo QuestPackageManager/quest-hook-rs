@@ -1,4 +1,3 @@
-
 fn main() {
     #[cfg(feature = "bindgen")]
     run_bindgen();
@@ -6,6 +5,8 @@ fn main() {
 
 #[cfg(feature = "bindgen")]
 fn run_bindgen() {
+    use std::env;
+    use std::path::PathBuf;
     use std::process::Command;
 
     use quest_build_helper::qpm;

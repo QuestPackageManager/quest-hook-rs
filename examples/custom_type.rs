@@ -63,7 +63,10 @@ fn set_position(this: &mut Il2CppObject, new_position: Vector3) {
     // the same way as `Transform`'s `invoke` above - is the equivalent of
     // C#'s `new List<Vector3>()`.
     let recent_positions: Gc<List<Vector3>> = List::new(());
-    debug!("tracking recent positions in {:?}", recent_positions.class());
+    debug!(
+        "tracking recent positions in {:?}",
+        recent_positions.class()
+    );
 
     set_position.original(this, new_position)
 }

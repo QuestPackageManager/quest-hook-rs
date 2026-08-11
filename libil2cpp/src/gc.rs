@@ -480,6 +480,10 @@ mod serde {
 }
 
 #[cfg(test)]
+// The `Type`/`RefType` stand-ins below deliberately use `unimplemented!()`
+// for the methods nothing under test calls into (they need a live il2cpp
+// runtime to mean anything) - not oversights.
+#[allow(clippy::unimplemented)]
 mod tests {
     use std::ptr::NonNull;
 

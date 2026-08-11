@@ -235,6 +235,9 @@ where
 }
 
 #[cfg(test)]
+// See the matching comment in gc.rs's test module - the `unimplemented!()`
+// bodies below are deliberate stand-ins, not oversights.
+#[allow(clippy::unimplemented)]
 mod tests {
     use super::*;
     use crate::{Il2CppObject, Il2CppType, Type};
