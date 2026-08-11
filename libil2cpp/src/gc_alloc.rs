@@ -6,7 +6,7 @@ use std::ptr::NonNull;
 use std::sync::Arc;
 
 use crate::raw::{GcAllocFixedFn, GcFreeFixedFn, GcFunctions};
-use crate::{Gc, NonNullGc, RefType, Type};
+use crate::{Gc, NonNullGc, RefType};
 
 /// An allocator that uses GC functions to allocate memory.
 /// This is useful for allocating memory that will be managed by the GC, such as
@@ -87,14 +87,14 @@ pub type GcArc<T> = std::sync::Arc<T, GcAllocator>;
 /// [`safe_ptr<T>`](https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/safeptr.hpp).
 pub struct SafePtr<T>
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     handle: GcArc<NonNullGc<T>>,
 }
 
 impl<T> SafePtr<T>
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     /// Roots `ptr`'s pointee for as long as this `SafePtr<T>` (or any clone
     /// of it) exists.
@@ -110,28 +110,43 @@ where
         Self { handle }
     }
 
-    /// Converts the current `Gc` instance to a `Gc` instance of another type.
-    ///
-    /// # Safety
-    /// See [`Gc::<T>::up_cast`].
-    pub fn up_cast<U>(&self) -> SafePtr<U>
+    /// Casts `T` to `U` using compiler-checked type conversion, which will fail
+    /// to compile if `T` is not convertible to `U`. This is a compile-time
+    /// checked cast, and will not perform any runtime checks.
+    /// 
+    /// See [`cast`](SafePtr::<T>::cast) for a runtime-checked cast that can fail at
+    /// runtime.
+    /// 
+    /// Cannot be null, since `SafePtr<T>` is never null (see [`SafePtr::new`]).
+    /// 
+    /// See [`Gc::type_cast`] for more details.
+    pub fn type_cast<U>(&self) -> SafePtr<U>
     where
-        U: for<'a> Type<Held<'a> = Option<&'a mut U>>,
+        U: RefType,
         T: AsMut<U>, // ensures T is convertible to U
     {
-        SafePtr::new(self.handle.as_gc().up_cast::<U>())
+        SafePtr::new(self.handle.as_gc().type_cast::<U>())
     }
 
-    /// Converts the current `Gc` instance to a `Gc` instance of another type.
+    /// Casts `T` to `U`, checked against the object's actual runtime class -
+    /// see [`Gc::cast`], which this calls before re-rooting the result
+    /// in a new [`SafePtr<U>`].
+    /// 
+    /// This cannot be null, since [`SafePtr<T>`] is never null (see [`SafePtr::new`]).
     ///
     /// # Safety
-    /// See [`Gc::<T>::down_cast`].
-    pub fn down_cast<U>(&self) -> Result<SafePtr<U>, String>
+    /// This function is safe to call, but the caller must ensure that the
+    /// [`Gc<T>`] is valid and points to a valid object of type `T`.
+    ///  If the [`Gc<T>`] points to an invalid object, this function
+    /// may cause undefined behavior. 
+    /// 
+    /// See [`Gc::cast`].
+    pub fn cast<U>(&self) -> Result<SafePtr<U>, String>
     where
-        U: for<'a> Type<Held<'a> = Option<&'a mut U>>,
+        U: RefType,
         T: RefType,
     {
-        let downcasted_ptr = self.handle.as_gc().down_cast::<U>()?;
+        let downcasted_ptr = self.handle.as_gc().cast::<U>()?;
         Ok(SafePtr::new(downcasted_ptr))
     }
 
@@ -143,7 +158,7 @@ where
 
 impl<T> Clone for SafePtr<T>
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     fn clone(&self) -> Self {
         Self {
@@ -154,18 +169,18 @@ where
 
 impl<T> PartialEq for SafePtr<T>
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     fn eq(&self, other: &Self) -> bool {
         self.handle.as_gc() == other.handle.as_gc()
     }
 }
 
-impl<T> Eq for SafePtr<T> where T: for<'a> Type<Held<'a> = Option<&'a mut T>> {}
+impl<T> Eq for SafePtr<T> where T: RefType {}
 
 impl<T> Deref for SafePtr<T>
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     type Target = T;
 
@@ -180,7 +195,7 @@ where
 
 impl<T> DerefMut for SafePtr<T>
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     fn deref_mut(&mut self) -> &mut T {
         // `Arc` never hands out `&mut` to its payload (shared ownership),
@@ -193,7 +208,7 @@ where
 
 impl<T> Debug for SafePtr<T>
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "SafePtr<{}>({:?})", T::CLASS_NAME, self.handle.as_gc())
@@ -202,7 +217,7 @@ where
 
 impl<T> From<SafePtr<T>> for Gc<T>
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     fn from(safe_ptr: SafePtr<T>) -> Self {
         safe_ptr.handle.as_gc()
@@ -211,7 +226,7 @@ where
 
 impl<T> From<Gc<T>> for SafePtr<T>
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
     fn from(gc: Gc<T>) -> Self {
         Self::new(gc)
@@ -221,24 +236,24 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Il2CppType;
+    use crate::{Il2CppObject, Il2CppType, Type};
 
-    /// A fake C# type, matching the `Dummy` used in `gc.rs`'s tests - just
-    /// enough of a `Type` impl to satisfy `SafePtr<T>`'s bound. Its
-    /// `matches_*` bodies are `unimplemented!()` since nothing under test
-    /// calls into the runtime.
+    /// A stand-in for `UnityEngine.Transform` - matching the one in `gc.rs`'s
+    /// tests, just enough of a `Type` impl to satisfy `SafePtr<T>`'s bound.
+    /// Its `matches_*`/`Deref` bodies are `unimplemented!()` since nothing
+    /// under test calls into the runtime.
     #[repr(C)]
-    struct Dummy {
+    struct Transform {
         #[allow(dead_code)]
         value: i32,
     }
 
-    unsafe impl Type for Dummy {
-        type Held<'a> = Option<&'a mut Dummy>;
-        type HeldRaw = *mut Dummy;
+    unsafe impl Type for Transform {
+        type Held<'a> = Option<&'a mut Transform>;
+        type HeldRaw = *mut Transform;
 
-        const NAMESPACE: &'static str = "Test";
-        const CLASS_NAME: &'static str = "Dummy";
+        const NAMESPACE: &'static str = "UnityEngine";
+        const CLASS_NAME: &'static str = "Transform";
 
         fn matches_reference_argument(_ty: &Il2CppType) -> bool {
             unimplemented!()
@@ -251,6 +266,73 @@ mod tests {
         }
         fn matches_value_parameter(_ty: &Il2CppType) -> bool {
             unimplemented!()
+        }
+    }
+
+    impl Deref for Transform {
+        type Target = Il2CppObject;
+
+        fn deref(&self) -> &Il2CppObject {
+            unimplemented!()
+        }
+    }
+
+    impl DerefMut for Transform {
+        fn deref_mut(&mut self) -> &mut Il2CppObject {
+            unimplemented!()
+        }
+    }
+
+    /// A stand-in for `UnityEngine.RectTransform`, a real subclass of
+    /// `UnityEngine.Transform` - genuinely *embeds* a `Transform` as its
+    /// first field (real C# single-inheritance layout), matching `gc.rs`'s
+    /// tests, rather than two unrelated types that only coincidentally share
+    /// a layout. Gives `type_cast`/`cast`'s `U` type parameter something
+    /// concrete to monomorphize against in the tests below.
+    #[repr(C)]
+    struct RectTransform {
+        #[allow(dead_code)]
+        transform: Transform,
+    }
+
+    unsafe impl Type for RectTransform {
+        type Held<'a> = Option<&'a mut RectTransform>;
+        type HeldRaw = *mut RectTransform;
+
+        const NAMESPACE: &'static str = "UnityEngine";
+        const CLASS_NAME: &'static str = "RectTransform";
+
+        fn matches_reference_argument(_ty: &Il2CppType) -> bool {
+            unimplemented!()
+        }
+        fn matches_value_argument(_ty: &Il2CppType) -> bool {
+            unimplemented!()
+        }
+        fn matches_reference_parameter(_ty: &Il2CppType) -> bool {
+            unimplemented!()
+        }
+        fn matches_value_parameter(_ty: &Il2CppType) -> bool {
+            unimplemented!()
+        }
+    }
+
+    impl Deref for RectTransform {
+        type Target = Il2CppObject;
+
+        fn deref(&self) -> &Il2CppObject {
+            unimplemented!()
+        }
+    }
+
+    impl DerefMut for RectTransform {
+        fn deref_mut(&mut self) -> &mut Il2CppObject {
+            unimplemented!()
+        }
+    }
+
+    impl AsMut<Transform> for RectTransform {
+        fn as_mut(&mut self) -> &mut Transform {
+            &mut self.transform
         }
     }
 
@@ -272,7 +354,7 @@ mod tests {
 
     #[test]
     fn safe_ptr_is_send_and_sync() {
-        assert_send_sync::<SafePtr<Dummy>>();
+        assert_send_sync::<SafePtr<Transform>>();
     }
 
     #[test]
@@ -285,10 +367,41 @@ mod tests {
     #[test]
     #[should_panic(expected = "GcAllocator not initialized")]
     fn safe_ptr_new_panics_without_a_live_runtime() {
-        let mut dummy = Dummy { value: 0 };
-        let gc = Gc::new(&mut dummy as *mut Dummy);
+        let mut transform = Transform { value: 0 };
+        let gc = Gc::new(&mut transform as *mut Transform);
         // Panics inside `SafePtr::new` (not UB, not a silent no-op) once it
         // reaches the `GcAllocator::new().expect(...)` call.
         let _ = SafePtr::new(gc);
+    }
+
+    // `type_cast`/`cast` themselves are even less reachable than the rest of
+    // `SafePtr<T>`: both take `&self`, so there's no way to call either
+    // without first getting past `SafePtr::new` - which, per the test above,
+    // always panics on a plain `cargo test` run. The two tests below can't
+    // exercise the casts' *runtime* behavior for that reason, but the calls
+    // are still fully monomorphized and typechecked against concrete `U`
+    // types even though they never execute - so they still catch a bound or
+    // signature regression on `SafePtr::type_cast`/`SafePtr::cast` (the kind
+    // this file has drifted into more than once while `Gc<T>`'s own
+    // `type_cast`/`cast` were being redesigned).
+
+    #[test]
+    #[should_panic(expected = "GcAllocator not initialized")]
+    fn safe_ptr_type_cast_is_unreachable_without_a_live_runtime() {
+        // Up-casting `RectTransform` to its real base class `Transform`.
+        let mut rect_transform = RectTransform {
+            transform: Transform { value: 0 },
+        };
+        let gc = Gc::new(&mut rect_transform as *mut RectTransform);
+        let _: SafePtr<Transform> = SafePtr::new(gc).type_cast();
+    }
+
+    #[test]
+    #[should_panic(expected = "GcAllocator not initialized")]
+    fn safe_ptr_cast_is_unreachable_without_a_live_runtime() {
+        // Down-casting a generic `Transform` handle to `RectTransform`.
+        let mut transform = Transform { value: 0 };
+        let gc = Gc::new(&mut transform as *mut Transform);
+        let _: Result<SafePtr<RectTransform>, String> = SafePtr::new(gc).cast();
     }
 }

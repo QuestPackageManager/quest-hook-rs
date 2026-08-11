@@ -1,6 +1,8 @@
 #![feature(never_type)]
 #![feature(trait_alias)]
 #![feature(allocator_api)]
+#![feature(try_trait_v2)]
+#![feature(try_trait_v2_residual)]
 #![doc(html_root_url = "https://stackdoubleflow.github.io/quest-hook-rs/libil2cpp")]
 #![warn(
     clippy::all,

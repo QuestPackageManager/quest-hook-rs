@@ -1,5 +1,5 @@
 use std::fmt::{self, Debug, Formatter};
-use std::ops::{Deref, DerefMut, Not};
+use std::ops::{Deref, DerefMut, FromResidual, Not, Residual, Try};
 use std::ptr::NonNull;
 
 use crate::{RefType, SafePtr, Type};
@@ -54,56 +54,67 @@ impl<T> Gc<T> {
     pub fn ensure_nonnull(&self) -> Result<NonNullGc<T>, NullGcError> {
         NonNull::new(self.0).map(NonNullGc).ok_or(NullGcError)
     }
+
+    /// Casts `T` to `U` using compiler-checked type conversion, which will fail
+    /// to compile if `T` is not convertible to `U`. This is a compile-time
+    /// checked cast, and will not perform any runtime checks.
+    ///
+    /// See [`cast`](Gc::cast) for a runtime-checked cast that can fail at
+    /// runtime.
+    pub fn type_cast<U>(self) -> Gc<U>
+    where
+        T: AsMut<U>, // ensures T is convertible to U
+    {
+        if self.is_null() {
+            return Gc::null();
+        }
+
+        let u = AsMut::as_mut(unsafe { &mut *self.0 });
+        Gc(u as *mut U)
+    }
 }
 
 impl<T> Gc<T>
 where
-    T: for<'a> Type<Held<'a> = Option<&'a mut T>>,
+    T: RefType,
 {
-    /// Converts the current `Gc` instance to a `Gc` instance of another type.
+    /// Casts `T` to `U`, checked against the object's actual runtime class -
+    /// can fail ([`Err`]) if it isn't really (assignable to) a `U`. Compare
+    /// [`type_cast`](Gc::type_cast), which trusts a compile-time
+    /// relationship instead of checking and never fails.
+    /// 
+    /// If the [`Gc<T>`] is null, this will return a null [`Gc<U>`] regardless of the type relationship.
     ///
-    /// # Safety
-    /// Relies on the `T` implementation of `AsMut<U>` to be correct.
-    pub fn up_cast<U>(mut self) -> Gc<U>
-    where
-        U: for<'a> Type<Held<'a> = Option<&'a mut U>>,
-        T: AsMut<U>, // ensures T is convertible to U
-    {
-        match self.as_mut() {
-            Some(value) => Gc::from(value.as_mut() as &mut U),
-            None => Gc::null(),
-        }
-    }
-
-    /// Converts the current `Gc` instance to a `Gc` instance of another type.
-    ///
-    /// # Safety
-    /// Relies on the `T` implementation of `AsMut<U>` to be correct.
-    /// See [`Gc::<T>::up_cast`] for a similar function.
     /// C++ Implementation
     /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/2604126ec26dd807da0be0ad974056d1f5fe9575/shared/utils/il2cpp-utils-classes.hpp#L185-L212>
-    pub fn down_cast<U>(mut self) -> Result<Gc<U>, String>
+    ///
+    /// # Safety
+    /// This function is safe to call, but the caller must ensure that the
+    /// [`Gc<T>`] is valid and points to a valid object of type `T`.  If the
+    /// [`Gc<T>`] points to an invalid object, this function may
+    /// cause undefined behavior.
+    pub fn cast<U>(mut self) -> Result<Gc<U>, String>
     where
-        U: for<'a> Type<Held<'a> = Option<&'a mut U>>,
+        U: RefType,
         T: RefType,
     {
-        match self.as_mut() {
-            Some(value) => {
-                let value_klass = value.as_object().class();
+        let Some(value) = self.as_mut() else {
+            return Ok(Gc::null());
+        };
 
-                if value_klass != U::class() && !value_klass.is_assignable_from(U::class()) {
-                    return Err(format!(
-                        "Downcast failed: {} is not assignable from {}",
-                        U::class().name(),
-                        value_klass.name()
-                    ));
-                }
+        let value_klass = value.as_object().class();
 
-                let cast = (value as *mut T).cast::<U>();
-                Ok(Gc(cast))
-            }
-            None => Ok(Gc::null()),
+        if value_klass != U::class() && !value_klass.is_assignable_from(U::class()) {
+            return Err(format!(
+                "Downcast failed: {} is not assignable from {}",
+                U::class().name(),
+                value_klass.name()
+            ));
         }
+
+        // we verified the type is correct, so we can safely cast the pointer
+        let cast = (value as *mut T).cast::<U>();
+        Ok(Gc(cast))
     }
 
     /// Converts the current `Gc` instance to a `SafePtr` instance of the same
@@ -139,6 +150,29 @@ where
 
     fn matches_value_parameter(ty: &crate::Il2CppType) -> bool {
         T::matches_value_parameter(ty)
+    }
+}
+
+impl<T> Try for Gc<T> {
+    type Output = Self;
+
+    type Residual = NullGcError;
+
+    fn from_output(output: Self::Output) -> Self {
+        output
+    }
+
+    fn branch(self) -> std::ops::ControlFlow<Self::Residual, Self::Output> {
+        if self.is_null() {
+            return std::ops::ControlFlow::Break(NullGcError);
+        }
+        std::ops::ControlFlow::Continue(self)
+    }
+}
+
+impl<T> FromResidual<NullGcError> for Gc<T> {
+    fn from_residual(_residual: NullGcError) -> Self {
+        Gc::null()
     }
 }
 
@@ -378,6 +412,10 @@ impl<T> From<NonNullGc<T>> for NonNull<T> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NullGcError;
 
+impl<T> Residual<Gc<T>> for NullGcError {
+    type TryType = Gc<T>;
+}
+
 impl fmt::Display for NullGcError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "Gc<T> was null")
@@ -445,25 +483,35 @@ mod tests {
     use std::ptr::NonNull;
 
     use super::*;
-    use crate::{Il2CppObject, Il2CppType};
+    use crate::{Il2CppClass, Il2CppObject, Il2CppType, WrapRaw};
 
-    /// A fake C# type used to exercise `Gc<T>`'s pointer bookkeeping without
-    /// needing a live il2cpp runtime. Its `Type`/`RefType`/`AsMut` bodies are
-    /// `unimplemented!()` since nothing under test calls into the runtime
-    /// (`class()`, `matches_*`, `as_object`) - only the paths that stay
-    /// entirely on the Rust side (null checks, deref, casts on a null `Gc`,
-    /// equality, conversions) are covered.
+    /// A stand-in for `UnityEngine.Transform`
     #[repr(C)]
-    struct Dummy {
+    struct Transform {
+        header: crate::raw::Il2CppObject,
         value: i32,
     }
 
-    unsafe impl Type for Dummy {
-        type Held<'a> = Option<&'a mut Dummy>;
-        type HeldRaw = *mut Dummy;
+    impl Transform {
+        fn new(value: i32) -> Self {
+            Self {
+                header: crate::raw::Il2CppObject {
+                    __bindgen_anon_1: crate::raw::Il2CppObject__bindgen_ty_1 {
+                        klass: std::ptr::null_mut(),
+                    },
+                    monitor: std::ptr::null_mut(),
+                },
+                value,
+            }
+        }
+    }
 
-        const NAMESPACE: &'static str = "Test";
-        const CLASS_NAME: &'static str = "Dummy";
+    unsafe impl Type for Transform {
+        type Held<'a> = Option<&'a mut Transform>;
+        type HeldRaw = *mut Transform;
+
+        const NAMESPACE: &'static str = "UnityEngine";
+        const CLASS_NAME: &'static str = "Transform";
 
         fn matches_reference_argument(_ty: &Il2CppType) -> bool {
             unimplemented!()
@@ -479,13 +527,80 @@ mod tests {
         }
     }
 
-    impl AsMut<Dummy> for Dummy {
-        fn as_mut(&mut self) -> &mut Dummy {
-            self
+    impl RefType for Transform {
+        fn as_object(&self) -> &Il2CppObject {
+            unsafe { Il2CppObject::wrap_ptr(&self.header).unwrap() }
+        }
+        fn as_object_mut(&mut self) -> &mut Il2CppObject {
+            unsafe { Il2CppObject::wrap_ptr_mut(&mut self.header).unwrap() }
         }
     }
 
-    impl RefType for Dummy {
+    /// A stand-in for `UnityEngine.RectTransform`
+    #[repr(C)]
+    struct RectTransform {
+        transform: Transform,
+        #[allow(dead_code)]
+        anchor_min: [f32; 2],
+    }
+
+    impl AsMut<Transform> for RectTransform {
+        fn as_mut(&mut self) -> &mut Transform {
+            &mut self.transform
+        }
+    }
+
+    /// A single, shared, locally leaked fake `Il2CppClass` standing in for
+    /// `RectTransform`'s real class - `RectTransform::class()` is
+    /// overridden to return it instead of calling `Il2CppClass::find` (which
+    /// needs a live il2cpp runtime). `down_cast_succeeds_when_class_matches`
+    /// also stamps it directly into a bare `Transform`'s header, simulating
+    /// "this `Transform` reference's underlying object is actually a
+    /// `RectTransform` at runtime" - enough to exercise `cast`'s
+    /// equal-class fast path (`value_klass == U::class()` short-circuits
+    /// the `&&` before `is_assignable_from`, the only part of `cast` that
+    /// would need a live runtime, to resolve the real
+    /// `class_is_assignable_from` FFI function). A genuine (non-identical)
+    /// class mismatch isn't testable the same way.
+    fn fake_rect_transform_class() -> &'static Il2CppClass {
+        static CLASS: std::sync::OnceLock<&'static Il2CppClass> = std::sync::OnceLock::new();
+        *CLASS.get_or_init(|| {
+            // SAFETY: `Il2CppClass` is a plain-old-data FFI struct (pointers
+            // and integers only) - never read through here except for
+            // pointer-identity comparisons, which a zeroed instance
+            // satisfies just as well as a real one.
+            let raw_class: crate::raw::Il2CppClass = unsafe { std::mem::zeroed() };
+            let leaked = Box::leak(Box::new(raw_class));
+            unsafe { Il2CppClass::wrap_ptr(leaked) }.unwrap()
+        })
+    }
+
+    unsafe impl Type for RectTransform {
+        type Held<'a> = Option<&'a mut RectTransform>;
+        type HeldRaw = *mut RectTransform;
+
+        const NAMESPACE: &'static str = "UnityEngine";
+        const CLASS_NAME: &'static str = "RectTransform";
+
+        fn class() -> &'static Il2CppClass {
+            fake_rect_transform_class()
+        }
+
+        fn matches_reference_argument(_ty: &Il2CppType) -> bool {
+            unimplemented!()
+        }
+        fn matches_value_argument(_ty: &Il2CppType) -> bool {
+            unimplemented!()
+        }
+        fn matches_reference_parameter(_ty: &Il2CppType) -> bool {
+            unimplemented!()
+        }
+        fn matches_value_parameter(_ty: &Il2CppType) -> bool {
+            unimplemented!()
+        }
+    }
+
+    impl RefType for RectTransform {
         fn as_object(&self) -> &Il2CppObject {
             unimplemented!()
         }
@@ -498,167 +613,223 @@ mod tests {
 
     #[test]
     fn gc_is_send_and_sync() {
-        assert_send_sync::<Gc<Dummy>>();
+        assert_send_sync::<Gc<Transform>>();
     }
 
     #[test]
     fn new_is_not_null() {
-        let mut dummy = Dummy { value: 42 };
-        let gc = Gc::new(&mut dummy as *mut Dummy);
+        let mut dummy = Transform::new(42);
+        let gc = Gc::new(&mut dummy as *mut Transform);
         assert!(!gc.is_null());
     }
 
     #[test]
     fn null_and_default_agree() {
-        let null_gc: Gc<Dummy> = Gc::null();
+        let null_gc: Gc<Transform> = Gc::null();
         assert!(null_gc.is_null());
         assert_eq!(null_gc, Gc::default());
     }
 
     #[test]
     fn as_ref_reflects_nullness() {
-        let mut dummy = Dummy { value: 7 };
-        let mut gc = Gc::new(&mut dummy as *mut Dummy);
+        let mut dummy = Transform::new(7);
+        let mut gc = Gc::new(&mut dummy as *mut Transform);
         assert_eq!(gc.as_ref().map(|d| d.value), Some(7));
         assert_eq!(gc.as_mut().map(|d| d.value), Some(7));
 
-        let mut null_gc: Gc<Dummy> = Gc::null();
+        let mut null_gc: Gc<Transform> = Gc::null();
         assert!(null_gc.as_ref().is_none());
         assert!(null_gc.as_mut().is_none());
     }
 
     #[test]
     fn get_pointer_matches_source() {
-        let mut dummy = Dummy { value: 0 };
-        let ptr = &mut dummy as *mut Dummy;
+        let mut dummy = Transform::new(0);
+        let ptr = &mut dummy as *mut Transform;
         let mut gc = Gc::new(ptr);
-        assert_eq!(gc.get_pointer(), ptr as *const Dummy);
+        assert_eq!(gc.get_pointer(), ptr as *const Transform);
         assert_eq!(gc.get_pointer_mut(), ptr);
     }
 
     #[test]
     fn deref_reads_and_writes_through_pointer() {
-        let mut dummy = Dummy { value: 99 };
-        let mut gc = Gc::new(&mut dummy as *mut Dummy);
+        let mut dummy = Transform::new(99);
+        let mut gc = Gc::new(&mut dummy as *mut Transform);
         assert_eq!(gc.value, 99);
         gc.value = 100;
         assert_eq!(dummy.value, 100);
     }
 
     #[test]
-    #[should_panic(expected = "Attempted to dereference a null type Test::Dummy")]
+    #[should_panic(expected = "Attempted to dereference a null type UnityEngine::Transform")]
     fn deref_panics_when_null() {
-        let gc: Gc<Dummy> = Gc::null();
+        let gc: Gc<Transform> = Gc::null();
         let _ = &*gc;
     }
 
     #[test]
-    #[should_panic(expected = "Attempted to dereference a null type Test::Dummy")]
+    #[should_panic(expected = "Attempted to dereference a null type UnityEngine::Transform")]
     fn deref_mut_panics_when_null() {
-        let mut gc: Gc<Dummy> = Gc::null();
+        let mut gc: Gc<Transform> = Gc::null();
         let _ = &mut *gc;
     }
 
     #[test]
     fn clone_copy_and_equality() {
-        let mut dummy = Dummy { value: 1 };
-        let gc = Gc::new(&mut dummy as *mut Dummy);
+        let mut dummy = Transform::new(1);
+        let gc = Gc::new(&mut dummy as *mut Transform);
         let gc_copied = gc;
         let gc_cloned = gc.clone();
         assert_eq!(gc, gc_copied);
         assert_eq!(gc, gc_cloned);
 
-        let other: Gc<Dummy> = Gc::null();
+        let other: Gc<Transform> = Gc::null();
         assert_ne!(gc, other);
     }
 
     #[test]
     fn from_pointer_conversions() {
-        let mut dummy = Dummy { value: 5 };
-        let ptr: *mut Dummy = &mut dummy;
+        let mut dummy = Transform::new(5);
+        let ptr: *mut Transform = &mut dummy;
 
-        let gc: Gc<Dummy> = ptr.into();
+        let gc: Gc<Transform> = ptr.into();
         assert!(!gc.is_null());
 
-        let const_ptr: *const Dummy = ptr;
-        let gc_from_const: Gc<Dummy> = const_ptr.into();
+        let const_ptr: *const Transform = ptr;
+        let gc_from_const: Gc<Transform> = const_ptr.into();
         assert_eq!(gc, gc_from_const);
 
-        let gc_from_mut_ref: Gc<Dummy> = (&mut dummy).into();
+        let gc_from_mut_ref: Gc<Transform> = (&mut dummy).into();
         assert_eq!(gc, gc_from_mut_ref);
     }
 
     #[test]
     fn from_option_ref_conversions() {
-        let mut dummy = Dummy { value: 5 };
+        let mut dummy = Transform::new(5);
 
-        let gc_some: Gc<Dummy> = Some(&mut dummy).into();
+        let gc_some: Gc<Transform> = Some(&mut dummy).into();
         assert!(!gc_some.is_null());
 
-        let gc_none: Gc<Dummy> = None::<&mut Dummy>.into();
+        let gc_none: Gc<Transform> = None::<&mut Transform>.into();
         assert!(gc_none.is_null());
     }
 
     #[test]
     fn option_ref_conversions_reflect_nullness() {
-        let mut dummy = Dummy { value: 5 };
-        let gc = Gc::new(&mut dummy as *mut Dummy);
-        let as_ref: Option<&Dummy> = gc.into();
+        let mut dummy = Transform::new(5);
+        let gc = Gc::new(&mut dummy as *mut Transform);
+        let as_ref: Option<&Transform> = gc.into();
         assert_eq!(as_ref.map(|d| d.value), Some(5));
 
-        let null_gc: Gc<Dummy> = Gc::null();
-        let as_ref: Option<&Dummy> = null_gc.into();
+        let null_gc: Gc<Transform> = Gc::null();
+        let as_ref: Option<&Transform> = null_gc.into();
         assert!(as_ref.is_none());
 
-        let as_mut: Option<&mut Dummy> = gc.into();
+        let as_mut: Option<&mut Transform> = gc.into();
         assert!(as_mut.is_some());
     }
 
     #[test]
     fn as_ref_as_mut() {
-        let mut dummy = Dummy { value: 3 };
-        let mut gc = Gc::new(&mut dummy as *mut Dummy);
-        assert_eq!(AsRef::<Dummy>::as_ref(&gc).value, 3);
-        AsMut::<Dummy>::as_mut(&mut gc).value = 4;
+        let mut dummy = Transform::new(3);
+        let mut gc = Gc::new(&mut dummy as *mut Transform);
+        assert_eq!(AsRef::<Transform>::as_ref(&gc).value, 3);
+        AsMut::<Transform>::as_mut(&mut gc).value = 4;
         assert_eq!(dummy.value, 4);
     }
 
     #[test]
     fn debug_format_distinguishes_null() {
-        let null_gc: Gc<Dummy> = Gc::null();
-        assert_eq!(format!("{:?}", null_gc), "Gc<Dummy>::null()");
+        let null_gc: Gc<Transform> = Gc::null();
+        assert_eq!(format!("{:?}", null_gc), "Gc<Transform>::null()");
 
-        let mut dummy = Dummy { value: 1 };
-        let gc = Gc::new(&mut dummy as *mut Dummy);
+        let mut dummy = Transform::new(1);
+        let gc = Gc::new(&mut dummy as *mut Transform);
         let formatted = format!("{:?}", gc);
-        assert_ne!(formatted, "Gc<Dummy>::null()");
-        assert!(formatted.starts_with("Gc<Dummy>("));
+        assert_ne!(formatted, "Gc<Transform>::null()");
+        assert!(formatted.starts_with("Gc<Transform>("));
+    }
+
+    #[test]
+    fn try_operator_short_circuits_on_null() {
+        fn use_dummy(gc: Gc<Transform>) -> Gc<Transform> {
+            let non_null = gc?; // early-returns `Gc::null()` via `FromResidual` if `gc` is null
+            non_null
+        }
+
+        let mut dummy = Transform::new(5);
+        let gc = Gc::new(&mut dummy as *mut Transform);
+        assert_eq!(use_dummy(gc), gc);
+
+        let null_gc: Gc<Transform> = Gc::null();
+        assert!(use_dummy(null_gc).is_null());
     }
 
     #[test]
     fn up_cast_on_null_stays_null() {
-        let gc: Gc<Dummy> = Gc::null();
-        let up: Gc<Dummy> = gc.up_cast();
+        let gc: Gc<RectTransform> = Gc::null();
+        let up: Gc<Transform> = gc.type_cast();
         assert!(up.is_null());
     }
 
     #[test]
+    fn type_cast_reinterprets_pointer_to_target_type() {
+        let mut rect_transform = RectTransform {
+            transform: Transform::new(77),
+            anchor_min: [0.0, 0.0],
+        };
+        let ptr = &mut rect_transform as *mut RectTransform;
+        let gc = Gc::new(ptr);
+
+        let base: Gc<Transform> = gc.type_cast();
+        assert!(!base.is_null());
+        // Same address - `RectTransform` embeds `Transform` as its first
+        // field, and `type_cast` just reinterprets in place, it doesn't
+        // move or allocate.
+        assert_eq!(base.get_pointer(), ptr as *const Transform);
+        // Sound to read, unlike a layout coincidence would be: this really
+        // is a `Transform` living at the front of a real `RectTransform`.
+        assert_eq!(base.as_ref().unwrap().value, 77);
+    }
+
+    #[test]
     fn down_cast_on_null_stays_null() {
-        let gc: Gc<Dummy> = Gc::null();
-        let down: Gc<Dummy> = gc.down_cast().unwrap();
+        let gc: Gc<Transform> = Gc::null();
+        let down: Gc<RectTransform> = gc.cast().unwrap();
         assert!(down.is_null());
     }
 
     #[test]
-    fn non_null_pointer_to_gc_wrapper_round_trips() {
-        let mut dummy = Dummy { value: 8 };
-        let mut gc = Gc::new(&mut dummy as *mut Dummy);
+    fn down_cast_succeeds_when_class_matches() {
+        // Simulates holding a `Gc<Transform>` whose underlying object's
+        // actual runtime type is `RectTransform` (e.g. it's a UI element) -
+        // a live il2cpp runtime would have stamped this class pointer into
+        // the header at allocation time.
+        let mut transform = Transform::new(55);
+        transform.header.__bindgen_anon_1.klass =
+            fake_rect_transform_class() as *const Il2CppClass as *mut crate::raw::Il2CppClass;
+        let ptr = &mut transform as *mut Transform;
+        let gc = Gc::new(ptr);
 
-        // `NonNull<Gc<Dummy>>` here is a non-null pointer to the *wrapper*
+        let cast: Gc<RectTransform> = gc.cast().unwrap();
+        assert!(!cast.is_null());
+        // Only checking address identity, not dereferencing as a
+        // `RectTransform` - the backing allocation here is only ever a bare
+        // `Transform`'s worth of memory, so reading `RectTransform`'s extra
+        // `anchor_min` field through it would be out of bounds.
+        assert_eq!(cast.get_pointer(), ptr as *const RectTransform);
+    }
+
+    #[test]
+    fn non_null_pointer_to_gc_wrapper_round_trips() {
+        let mut dummy = Transform::new(8);
+        let mut gc = Gc::new(&mut dummy as *mut Transform);
+
+        // `NonNull<Gc<Transform>>` here is a non-null pointer to the *wrapper*
         // (guaranteed by taking it from a live `&mut`), not a claim about
-        // whether the `Gc<Dummy>` it points at is the null C# reference.
-        let ptr: NonNull<Gc<Dummy>> = NonNull::from(&mut gc);
-        // SAFETY: `ptr` was just derived from a valid, live `&mut Gc<Dummy>`
+        // whether the `Gc<Transform>` it points at is the null C# reference.
+        let ptr: NonNull<Gc<Transform>> = NonNull::from(&mut gc);
+        // SAFETY: `ptr` was just derived from a valid, live `&mut Gc<Transform>`
         // that outlives this call.
         let gc_via_ptr = unsafe { ptr.as_ref() };
         assert_eq!(*gc_via_ptr, gc);
@@ -671,9 +842,9 @@ mod tests {
         // non-null - a null `Gc<T>` living at a perfectly valid stack
         // address is a legitimate `NonNull<Gc<T>>` target, and dereferencing
         // the pointer still yields a `Gc<T>` that reports `is_null()`.
-        let mut null_gc: Gc<Dummy> = Gc::null();
+        let mut null_gc: Gc<Transform> = Gc::null();
         let ptr = NonNull::from(&mut null_gc);
-        // SAFETY: `ptr` was just derived from a valid, live `&mut Gc<Dummy>`
+        // SAFETY: `ptr` was just derived from a valid, live `&mut Gc<Transform>`
         // that outlives this call.
         let gc_via_ptr = unsafe { ptr.as_ref() };
         assert!(gc_via_ptr.is_null());
@@ -681,21 +852,21 @@ mod tests {
 
     #[test]
     fn non_null_gc_new_rejects_null_sources() {
-        let mut dummy = Dummy { value: 11 };
-        let gc = Gc::new(&mut dummy as *mut Dummy);
+        let mut dummy = Transform::new(11);
+        let gc = Gc::new(&mut dummy as *mut Transform);
         assert!(NonNullGc::new(gc).is_some());
 
-        let null_gc: Gc<Dummy> = Gc::null();
+        let null_gc: Gc<Transform> = Gc::null();
         assert!(NonNullGc::new(null_gc).is_none());
 
-        let null_ptr: *mut Dummy = std::ptr::null_mut();
+        let null_ptr: *mut Transform = std::ptr::null_mut();
         assert!(NonNullGc::new(null_ptr).is_none());
     }
 
     #[test]
     fn non_null_gc_derefs_like_gc() {
-        let mut dummy = Dummy { value: 20 };
-        let gc = Gc::new(&mut dummy as *mut Dummy);
+        let mut dummy = Transform::new(20);
+        let gc = Gc::new(&mut dummy as *mut Transform);
         let mut non_null = NonNullGc::new(gc).unwrap();
 
         // Reads through it the same way `Gc<T>` does.
@@ -707,43 +878,49 @@ mod tests {
 
     #[test]
     fn non_null_gc_widens_back_to_the_same_gc() {
-        let mut dummy = Dummy { value: 30 };
-        let gc = Gc::new(&mut dummy as *mut Dummy);
+        let mut dummy = Transform::new(30);
+        let gc = Gc::new(&mut dummy as *mut Transform);
         let non_null = NonNullGc::new(gc).unwrap();
 
-        let widened: Gc<Dummy> = non_null.into();
+        let widened: Gc<Transform> = non_null.into();
         assert_eq!(widened, gc);
         assert!(!widened.is_null());
     }
 
     #[test]
     fn non_null_gc_from_references() {
-        let mut dummy = Dummy { value: 40 };
+        let mut dummy = Transform::new(40);
 
-        let from_shared: NonNullGc<Dummy> = (&dummy).into();
+        let from_shared: NonNullGc<Transform> = (&dummy).into();
         assert_eq!(from_shared.value, 40);
 
-        let from_mut: NonNullGc<Dummy> = (&mut dummy).into();
+        let from_mut: NonNullGc<Transform> = (&mut dummy).into();
         assert_eq!(from_mut.value, 40);
     }
 
     #[test]
     fn non_null_gc_type_matches_gc_type() {
         assert_eq!(
-            <NonNullGc<Dummy> as Type>::NAMESPACE,
-            <Gc<Dummy> as Type>::NAMESPACE
+            <NonNullGc<Transform> as Type>::NAMESPACE,
+            <Gc<Transform> as Type>::NAMESPACE
         );
         assert_eq!(
-            <NonNullGc<Dummy> as Type>::CLASS_NAME,
-            <Gc<Dummy> as Type>::CLASS_NAME
+            <NonNullGc<Transform> as Type>::CLASS_NAME,
+            <Gc<Transform> as Type>::CLASS_NAME
         );
-        assert_eq!(<NonNullGc<Dummy> as Type>::NAMESPACE, Dummy::NAMESPACE);
-        assert_eq!(<NonNullGc<Dummy> as Type>::CLASS_NAME, Dummy::CLASS_NAME);
+        assert_eq!(
+            <NonNullGc<Transform> as Type>::NAMESPACE,
+            Transform::NAMESPACE
+        );
+        assert_eq!(
+            <NonNullGc<Transform> as Type>::CLASS_NAME,
+            Transform::CLASS_NAME
+        );
     }
 
     #[test]
     fn non_null_gc_is_send_and_sync() {
-        assert_send_sync::<NonNullGc<Dummy>>();
+        assert_send_sync::<NonNullGc<Transform>>();
     }
 
     #[test]
@@ -751,12 +928,12 @@ mod tests {
         // `NonNullGc<T>` is `#[repr(transparent)]` over `NonNull<T>` - it
         // should cost nothing over the plain nullable wrapper.
         assert_eq!(
-            std::mem::size_of::<NonNullGc<Dummy>>(),
-            std::mem::size_of::<Gc<Dummy>>()
+            std::mem::size_of::<NonNullGc<Transform>>(),
+            std::mem::size_of::<Gc<Transform>>()
         );
         assert_eq!(
-            std::mem::align_of::<NonNullGc<Dummy>>(),
-            std::mem::align_of::<Gc<Dummy>>()
+            std::mem::align_of::<NonNullGc<Transform>>(),
+            std::mem::align_of::<Gc<Transform>>()
         );
     }
 
@@ -769,11 +946,11 @@ mod tests {
         // the same size as `NonNullGc<T>` itself, while `Option<Gc<T>>`
         // does not.
         assert_eq!(
-            std::mem::size_of::<Option<NonNullGc<Dummy>>>(),
-            std::mem::size_of::<NonNullGc<Dummy>>()
+            std::mem::size_of::<Option<NonNullGc<Transform>>>(),
+            std::mem::size_of::<NonNullGc<Transform>>()
         );
         assert!(
-            std::mem::size_of::<Option<Gc<Dummy>>>() > std::mem::size_of::<Gc<Dummy>>(),
+            std::mem::size_of::<Option<Gc<Transform>>>() > std::mem::size_of::<Gc<Transform>>(),
             "Gc<T> has no niche, so Option<Gc<T>> is expected to be larger"
         );
     }

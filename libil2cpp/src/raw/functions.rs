@@ -70,6 +70,7 @@ il2cpp_functions! { pub IL2CPP_BINARY =>
 /// rather than a callable wrapper - it's meant for xref use, where a known
 /// symbol is used as a disassembly starting point to locate a function that
 /// isn't itself exported.
+#[allow(unused)]
 pub(crate) fn symbol_addr(name: &[u8]) -> Option<usize> {
     unsafe { LIBIL2CPP.get::<*const ()>(name) }
         .ok()
