@@ -35,6 +35,7 @@ pub fn expand(range: Range<usize>) -> Result<TokenStream> {
         let generic_params_argument_tuple = generic_params_argument.clone();
         let generic_params_argument_where = generic_params_argument.clone();
         let generic_params_argument_type = generic_params_argument.clone();
+        let generic_params_argument_classes = generic_params_argument.clone();
 
         let generic_params_parameter_tuple = generic_params_parameter.clone();
         let generic_params_parameter_where = generic_params_parameter.clone();
@@ -49,6 +50,10 @@ pub fn expand(range: Range<usize>) -> Result<TokenStream> {
                 fn matches(method: &MethodInfo) -> bool {
                     let params = method.parameters();
                     params.len() == #n && unsafe { #(#matches_argument) && * }
+                }
+
+                fn classes() -> [&'static Il2CppClass; #n] {
+                    [#(#generic_params_argument_classes::class()),*]
                 }
 
                 fn invokable(&mut self) -> [*mut c_void; #n] {

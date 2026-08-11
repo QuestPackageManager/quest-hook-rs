@@ -107,6 +107,13 @@ impl Il2CppClass {
 
     /// Find a method belonging to the class or its parents by name with type
     /// checking
+    ///
+    /// If more than one method type-checks (an overload), the best match is
+    /// picked the same way beatsaber-hook's `find_method` does: a candidate
+    /// whose parameters are an exact class-for-class match wins immediately,
+    /// otherwise every candidate is scored by [`param_distance`] and the
+    /// lowest-scoring one is used - this never fails merely because more
+    /// than one overload type-checks (see [`Self::resolve_method`]).
     #[crate::instrument(level = "debug")]
     pub fn find_method<A, R, const N: usize>(
         &self,
@@ -135,55 +142,19 @@ impl Il2CppClass {
             key
         };
 
-        for c in self.hierarchy() {
-            let mut matching = c
-                .methods()
-                .iter()
-                .filter(|mi| mi.name() == name && A::matches(mi) && R::matches(mi.return_ty()))
-                .copied();
+        let method = self.resolve_method::<A, R, N>(name, false)?;
 
-            match (matching.next(), matching.next()) {
-                // only one match
-                (Some(mi), None) => {
-                    #[cfg(feature = "cache")]
-                    cache::METHOD_CACHE.with(move |c| c.borrow_mut().insert(key.into(), mi));
+        #[cfg(feature = "cache")]
+        cache::METHOD_CACHE.with(move |c| c.borrow_mut().insert(key.into(), method));
 
-                    return Ok(mi);
-                }
-
-                // multiple matches
-                (Some(mi), Some(mi2)) => {
-                    let found = vec![mi, mi2]
-                        .into_iter()
-                        .chain(matching)
-                        .map(|mi| {
-                            let info = FindMethodParameters {
-                                ty_name: c.to_string(),
-                                method_name: name.to_string(),
-                                parameters: mi.parameters().iter().map(|t| t.to_string()).collect(),
-                            };
-                            info
-                        })
-                        .collect();
-
-                    return Err(FindMethodError::Many(found));
-                }
-
-                // If we have no matches, we continue to the parent
-                _ => continue,
-            }
-        }
-
-        let info = FindMethodParameters {
-            ty_name: self.to_string(),
-            method_name: name.to_string(),
-            // TODO!
-            parameters: vec![format!("UNABLE TO PROVIDE! Count! {N}")],
-        };
-        Err(FindMethodError::None(info))
+        Ok(method)
     }
 
-    /// Find a `static` method belonging to the class by name with type checking
+    /// Find a `static` method belonging to the class by name with type
+    /// checking
+    ///
+    /// See [`find_method`](Self::find_method) for how overloads are
+    /// resolved when more than one candidate type-checks.
     #[crate::instrument(level = "debug")]
     pub fn find_static_method<A, R, const N: usize>(
         &self,
@@ -212,63 +183,86 @@ impl Il2CppClass {
             key
         };
 
-        for c in self.hierarchy() {
-            let mut matching = c
-                .methods()
-                .iter()
-                .filter(|mi| {
-                    debug!("Looking for method: {}.{}", self, name);
-                    debug!("mi.name() == name: {}", mi.name() == name);
-                    debug!("mi.is_static(): {}", mi.is_static());
-                    debug!("A::matches(mi): {}", A::matches(mi));
-                    debug!("R::matches(mi.return_ty()): {}", R::matches(mi.return_ty()));
-                    debug!("");
-                    mi.name() == name
-                        && mi.is_static()
-                        && A::matches(mi)
-                        && R::matches(mi.return_ty())
-                })
-                .copied();
+        let method = self.resolve_method::<A, R, N>(name, true)?;
+        debug!("Found method: {}.{}", self, name);
 
-            match (matching.next(), matching.next()) {
-                // only one match
-                (Some(mi), None) => {
-                    #[cfg(feature = "cache")]
-                    cache::METHOD_CACHE.with(move |c| c.borrow_mut().insert(key.into(), mi));
-                    debug!("Found method: {}.{}", self, name);
-                    return Ok(mi);
+        #[cfg(feature = "cache")]
+        cache::METHOD_CACHE.with(move |c| c.borrow_mut().insert(key.into(), method));
+
+        Ok(method)
+    }
+
+    /// Shared implementation of [`find_method`](Self::find_method) and
+    /// [`find_static_method`](Self::find_static_method) - walks the class
+    /// hierarchy collecting every method named `name` (optionally requiring
+    /// it be `static`) that [`A::matches`](Arguments::matches)/
+    /// [`R::matches`](Returned::matches) already approve as callable, then
+    /// ranks the candidates the way beatsaber-hook's `find_method` +
+    /// `param_distance` do (`find.cpp`): the first candidate whose
+    /// parameters are all an exact class match wins immediately; otherwise
+    /// every convertible candidate is scored (lower is closer, see
+    /// [`method_weight`]) and the lowest-scoring one wins. Multiple
+    /// convertible candidates only ever produce a `debug!` note, mirroring
+    /// upstream, which never fails merely because more than one overload
+    /// type-checks.
+    fn resolve_method<A, R, const N: usize>(
+        &self,
+        name: &str,
+        static_only: bool,
+    ) -> Result<&'static MethodInfo, FindMethodError>
+    where
+        A: Arguments<N>,
+        R: Returned,
+    {
+        let arg_classes = A::classes();
+
+        let mut best: Option<&'static MethodInfo> = None;
+        let mut best_weight = i32::MAX;
+        let mut multiple = false;
+
+        'hierarchy: for c in self.hierarchy() {
+            for mi in c.methods().iter().copied() {
+                if mi.name() != name
+                    || (static_only && !mi.is_static())
+                    || !A::matches(mi)
+                    || !R::matches(mi.return_ty())
+                {
+                    continue;
                 }
 
-                // multiple matches
-                (Some(mi), Some(mi2)) => {
-                    let found = vec![mi, mi2]
-                        .into_iter()
-                        .chain(matching)
-                        .map(|mi| {
-                            let info = FindMethodParameters {
-                                ty_name: c.to_string(),
-                                method_name: name.to_string(),
-                                parameters: mi.parameters().iter().map(|t| t.to_string()).collect(),
-                            };
-                            info
-                        })
-                        .collect();
-
-                    return Err(FindMethodError::Many(found));
+                match method_weight(mi, &arg_classes) {
+                    Closeness::Exact => {
+                        best = Some(mi);
+                        break 'hierarchy;
+                    }
+                    Closeness::Convertible(weight) if weight < best_weight => {
+                        multiple = best.is_some();
+                        best_weight = weight;
+                        best = Some(mi);
+                    }
+                    Closeness::Convertible(_) => {}
                 }
-
-                // If we have no matches, we continue to the parent
-                _ => continue,
             }
         }
 
-        let info = FindMethodParameters {
-            ty_name: self.to_string(),
-            method_name: name.to_string(),
-            // TODO!
-            parameters: vec![format!("UNABLE TO PROVIDE! Count! {N}")],
+        let Some(best) = best else {
+            let info = FindMethodParameters {
+                ty_name: self.to_string(),
+                method_name: name.to_string(),
+                // TODO!
+                parameters: vec![format!("UNABLE TO PROVIDE! Count! {N}")],
+            };
+            return Err(FindMethodError::None(info));
         };
-        Err(FindMethodError::None(info))
+
+        if multiple {
+            debug!(
+                "Multiple overloads of {}.{} type-checked with different weights - picked {}",
+                self, name, best
+            );
+        }
+
+        Ok(best)
     }
 
     /// Find a method belonging to the class or its parents by name with type
@@ -726,6 +720,126 @@ impl<'a> From<&'a Il2CppType> for &'a Il2CppClass {
     }
 }
 
+/// How closely a candidate method's parameters match the arguments an
+/// overload is being resolved against - see [`param_distance`] and
+/// [`method_weight`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Closeness {
+    /// Every parameter's class is identical to the corresponding argument's
+    /// class.
+    Exact,
+    /// At least one parameter only matched via assignability rather than an
+    /// identical class - lower is a closer match. Can go negative (see
+    /// [`param_distance`]).
+    Convertible(i32),
+}
+
+/// Distance between a method parameter's declared class and the class of
+/// the argument being passed for it - ports beatsaber-hook's
+/// `param_distance` (`find.cpp`) verbatim, quirks included, since
+/// [`Self::resolve_method`] uses it to rank overloads exactly the way
+/// upstream does.
+///
+/// Lower is closer. `0` (well, [`Closeness::Exact`]) means the classes are
+/// identical. Otherwise this walks `passed_class`'s assignability chain up
+/// to `method_class` (one point of distance per step, breaking early if it
+/// stops being assignable), then adjusts for shared implemented interfaces.
+/// Interfaces are strongly preferred against other interfaces and strongly
+/// avoided when a concrete `method_class` was expected but an interface was
+/// passed (`1000` - `find.cpp` calls this out as "avoid" via a large
+/// constant, not a hard rejection).
+fn param_distance(method_class: &Il2CppClass, passed_class: &Il2CppClass) -> Closeness {
+    if method_class == passed_class {
+        return Closeness::Exact;
+    }
+
+    let mut distance = 0;
+
+    let is_method_iface = method_class.is_interface();
+    let is_passed_iface = passed_class.is_interface();
+    if is_passed_iface && !is_method_iface {
+        return Closeness::Convertible(1000);
+    }
+    if is_method_iface {
+        distance += 5;
+    }
+
+    // Walk up `passed_class`'s parent chain towards `method_class`, one
+    // point of distance per step.
+    let mut passed = passed_class;
+    while passed != method_class {
+        if !method_class.is_assignable_from(passed) {
+            break;
+        }
+        match passed.parent() {
+            Some(parent) => passed = parent,
+            None => break,
+        }
+        distance += 1;
+    }
+
+    // Mirrors `find.cpp`'s `param_distance` exactly: `passed` here is
+    // whatever the walk above left it as (not necessarily the original
+    // `passed_class`), and the two interface lists are compared as if
+    // sorted by address - a merge-style intersection that only actually
+    // finds shared entries if both classes' `implementedInterfaces` arrays
+    // happen to list them in the same (address) order.
+    let method_ifaces = method_class.implemented_interfaces();
+    let passed_ifaces = passed.implemented_interfaces();
+    let mut mi = 0;
+    let mut pi = 0;
+    while mi < method_ifaces.len() && pi < passed_ifaces.len() {
+        let m = ptr::from_ref(method_ifaces[mi]);
+        let p = ptr::from_ref(passed_ifaces[pi]);
+        match m.cmp(&p) {
+            std::cmp::Ordering::Less => mi += 1,
+            std::cmp::Ordering::Greater => pi += 1,
+            std::cmp::Ordering::Equal => {
+                mi += 1;
+                pi += 1;
+                distance -= 1;
+            }
+        }
+    }
+
+    Closeness::Convertible(distance)
+}
+
+/// Aggregate [`Closeness`] of a candidate method against a full argument
+/// list - [`Closeness::Exact`] only if every parameter is
+/// [`Closeness::Exact`], otherwise the sum of every parameter's distance
+/// (treating an exact parameter as contributing `0`). Mirrors the
+/// `by_types` branch of beatsaber-hook's `find_method` switching on
+/// `param_match`'s result.
+///
+/// Only meaningful for a candidate that's already passed the crate's own
+/// (assignability-based) [`Arguments::matches`] check - this doesn't
+/// independently re-verify convertibility, only ranks already-approved
+/// candidates.
+fn method_weight<const N: usize>(
+    mi: &MethodInfo,
+    arg_classes: &[&'static Il2CppClass; N],
+) -> Closeness {
+    let mut weight = 0;
+    let mut exact = true;
+
+    for (param, &arg_class) in mi.parameters().iter().zip(arg_classes) {
+        match param_distance(param.ty().class(), arg_class) {
+            Closeness::Exact => {}
+            Closeness::Convertible(d) => {
+                exact = false;
+                weight += d;
+            }
+        }
+    }
+
+    if exact {
+        Closeness::Exact
+    } else {
+        Closeness::Convertible(weight)
+    }
+}
+
 /// No matching method were found
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FindMethodParameters {
@@ -1021,5 +1135,34 @@ mod tests {
         let class = fake_class(0); // implements nothing
 
         assert!(class.find_method_by_vtable(iface, 0).is_none());
+    }
+
+    // `param_distance` only has two branches reachable without a live
+    // il2cpp runtime: the identity fast path, and the "passed an interface
+    // where a concrete class was expected" early return - every other path
+    // calls `Il2CppClass::is_assignable_from`, which (once the classes
+    // differ) always falls through to the real `class_is_assignable_from`
+    // FFI function. Ranking overloads end to end
+    // (`method_weight`/`resolve_method`/`find_method`) also needs
+    // `Il2CppType::class()`, which always calls `class_from_il2cpp_type` -
+    // there's no fake-struct path around either. Both need a live,
+    // initialized runtime to exercise safely, the same boundary
+    // `tests/gc_alloc.rs` documents hitting for GC allocation.
+
+    #[test]
+    fn param_distance_is_exact_for_identical_classes() {
+        let class = fake_class(0);
+        assert_eq!(param_distance(class, class), Closeness::Exact);
+    }
+
+    #[test]
+    fn param_distance_penalizes_passing_an_interface_for_a_concrete_parameter() {
+        let method_param = fake_class(0); // concrete, not an interface
+        let passed = fake_class(raw::TYPE_ATTRIBUTE_INTERFACE);
+
+        assert_eq!(
+            param_distance(method_param, passed),
+            Closeness::Convertible(1000)
+        );
     }
 }

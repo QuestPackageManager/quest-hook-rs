@@ -4,7 +4,7 @@ use std::mem::transmute;
 use std::ptr::null_mut;
 
 use crate::byref::{ByRef, ReffableType};
-use crate::{Builtin, Gc, Il2CppObject, Il2CppType, MethodInfo, RefType, Type};
+use crate::{Builtin, Gc, Il2CppClass, Il2CppObject, Il2CppType, MethodInfo, RefType, Type};
 
 /// Trait implemented by types that can be used as a C# `this` arguments
 ///
@@ -42,6 +42,12 @@ pub unsafe trait Argument {
     /// Checks whether the type can be used as a C# argument with the given
     /// [`Il2CppType`] to call a method
     fn matches(ty: &Il2CppType) -> bool;
+
+    /// [`Il2CppClass`] of the argument's static type - used to rank
+    /// candidate overloads by how close a match they are (see
+    /// [`Il2CppClass::find_method`]'s use of `param_distance`) once more
+    /// than one candidate [`matches`](Argument::matches)
+    fn class() -> &'static Il2CppClass;
 
     /// Returns an untyped pointer which can be used as a libil2cpp argument
     fn invokable(&mut self) -> *mut c_void;
@@ -83,6 +89,10 @@ pub unsafe trait Arguments<const N: usize> {
     /// Checks whether the type can be used as a C# argument collection for the
     /// given [`MethodInfo`]
     fn matches(method: &MethodInfo) -> bool;
+
+    /// [`Il2CppClass`]es of each argument's static type, in order - see
+    /// [`Argument::class`]
+    fn classes() -> [&'static Il2CppClass; N];
 
     /// Returns an array of untyped pointer which can be used to invoke C#
     /// methods
@@ -185,6 +195,10 @@ where
         T::matches_reference_argument(ty)
     }
 
+    fn class() -> &'static Il2CppClass {
+        T::class()
+    }
+
     fn invokable(&mut self) -> *mut c_void {
         unsafe { transmute((self as *mut Self).read()) }
     }
@@ -199,6 +213,10 @@ where
 
     fn matches(ty: &Il2CppType) -> bool {
         T::matches_reference_argument(ty)
+    }
+
+    fn class() -> &'static Il2CppClass {
+        T::class()
     }
 
     fn invokable(&mut self) -> *mut c_void {
@@ -218,6 +236,10 @@ where
         T::matches_reference_argument(ty)
     }
 
+    fn class() -> &'static Il2CppClass {
+        T::class()
+    }
+
     fn invokable(&mut self) -> *mut c_void {
         (*self as *mut T).cast()
     }
@@ -225,7 +247,7 @@ where
 
 #[rustfmt::skip]
 unsafe impl<T> Argument for Gc<T>
-where 
+where
     T: RefType,
 
 {
@@ -235,6 +257,10 @@ where
         T::matches_reference_argument(ty)
     }
 
+    fn class() -> &'static Il2CppClass {
+        T::class()
+    }
+
     fn invokable(&mut self) -> *mut c_void {
         <*mut T as Argument>::invokable(&mut self.get_pointer_mut())
     }
@@ -242,7 +268,7 @@ where
 
 #[rustfmt::skip]
 unsafe impl< T> Argument for ByRef< T>
-where 
+where
     T: ReffableType,
 {
     type Type = T;
@@ -252,6 +278,10 @@ where
     // will also class check
     fn matches(ty: &Il2CppType) -> bool {
         T::matches_reference_argument(ty)
+    }
+
+    fn class() -> &'static Il2CppClass {
+        <T as Type>::class()
     }
 
     fn invokable(&mut self) -> *mut c_void {
@@ -406,6 +436,10 @@ unsafe impl Arguments<0> for () {
         method.parameters().is_empty()
     }
 
+    fn classes() -> [&'static Il2CppClass; 0] {
+        []
+    }
+
     fn invokable(&mut self) -> [*mut c_void; 0] {
         []
     }
@@ -420,6 +454,10 @@ where
     fn matches(method: &MethodInfo) -> bool {
         let params = method.parameters();
         params.len() == 1 && unsafe { A::matches(params.get_unchecked(0).ty()) }
+    }
+
+    fn classes() -> [&'static Il2CppClass; 1] {
+        [A::class()]
     }
 
     fn invokable(&mut self) -> [*mut c_void; 1] {

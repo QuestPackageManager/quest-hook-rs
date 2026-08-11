@@ -6,8 +6,8 @@ pub mod ty;
 use std::ffi::c_void;
 
 use crate::{
-    raw, Argument, Arguments, Generics, Il2CppReflectionType, MethodInfo, Parameter, Parameters,
-    Type, WrapRaw,
+    raw, Argument, Arguments, Generics, Il2CppClass, Il2CppReflectionType, MethodInfo, Parameter,
+    Parameters, Type, WrapRaw,
 };
 
 quest_hook_proc_macros::impl_arguments_parameters!(1..=32);

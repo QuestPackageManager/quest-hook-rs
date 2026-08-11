@@ -58,25 +58,25 @@ where
     const CLASS_NAME: &'static str = T::CLASS_NAME;
 
     fn class() -> &'static crate::Il2CppClass {
-        T::class()
+        <T as Type>::class()
     }
 
     fn type_() -> &'static crate::Il2CppType {
-        T::class().this_arg_ty()
+        <T as Type>::class().this_arg_ty()
     }
 
     fn matches_value_argument(_: &crate::Il2CppType) -> bool {
         false
     }
     fn matches_reference_argument(ty: &crate::Il2CppType) -> bool {
-        T::class().this_arg_ty() == ty
+        <T as Type>::class().this_arg_ty() == ty
             || ty.is_ref() && ty.class().is_assignable_from(<T as crate::Type>::class())
     }
     fn matches_value_parameter(_: &crate::Il2CppType) -> bool {
         false
     }
     fn matches_reference_parameter(ty: &crate::Il2CppType) -> bool {
-        T::class().this_arg_ty() == ty
+        <T as Type>::class().this_arg_ty() == ty
             || ty.is_ref() && <T as crate::Type>::class().is_assignable_from(ty.class())
     }
 }

@@ -178,6 +178,9 @@ unsafe impl<const N: usize> crate::Argument for ValueTypePadding<N> {
     fn matches(ty: &crate::Il2CppType) -> bool {
         <Self as crate::Type>::matches_value_argument(ty)
     }
+    fn class() -> &'static crate::Il2CppClass {
+        <Self as crate::Type>::class()
+    }
     fn invokable(&mut self) -> *mut ::std::ffi::c_void {
         (self as *mut Self).cast::<::std::ffi::c_void>()
     }

@@ -323,6 +323,7 @@ impl Input {
     fn value_extras(&self) -> TokenStream2 {
         let ty = &self.ty;
         let type_trait = self.type_trait();
+        let class_ty = self.class_ty();
         let generics = &self.rust_generics;
         let path = &self.path;
 
@@ -335,6 +336,10 @@ impl Input {
 
                 fn matches(ty: &#path::Il2CppType) -> bool {
                     <Self as #type_trait>::matches_value_argument(ty)
+                }
+
+                fn class() -> &'static #class_ty {
+                    <Self as #type_trait>::class()
                 }
 
                 fn invokable(&mut self) -> *mut ::std::ffi::c_void {
