@@ -249,7 +249,7 @@ impl Il2CppClass {
             let info = FindMethodParameters {
                 ty_name: self.to_string(),
                 method_name: name.to_string(),
-                    parameters: arg_classes.iter().map(|c| c.to_string()).collect(),
+                parameters: arg_classes.iter().map(|c| c.to_string()).collect(),
             };
             return Err(FindMethodError::None(info));
         };
@@ -589,6 +589,34 @@ impl Il2CppClass {
         unsafe { Self::wrap_ptr(self.raw().parent) }
     }
 
+    /// The type this one is nested in, if it's a nested type
+    pub fn declaring_type(&self) -> Option<&Self> {
+        unsafe { Self::wrap_ptr(self.raw().declaringType) }
+    }
+
+    /// Generic type arguments this class was instantiated with (e.g. `[Foo,
+    /// Bar]` for a `Something<Foo, Bar>`), empty if this isn't a generic
+    /// instantiation.
+    pub fn generic_arguments(&self) -> &[&Il2CppType] {
+        let generic_class = self.raw().generic_class;
+        let Some(context) = (unsafe { generic_class.as_ref() }).map(|c| &c.context) else {
+            return &[];
+        };
+
+        let inst = if !context.class_inst.is_null() {
+            context.class_inst
+        } else {
+            context.method_inst
+        };
+
+        match unsafe { inst.as_ref() } {
+            Some(inst) => unsafe {
+                slice::from_raw_parts(inst.type_argv as _, inst.type_argc as _)
+            },
+            None => &[],
+        }
+    }
+
     /// Iterator over the class hierarchy, starting with the class itself
     pub fn hierarchy(&self) -> Hierarchy<'_> {
         Hierarchy {
@@ -687,23 +715,40 @@ impl<'a> Iterator for Hierarchy<'a> {
 
 impl fmt::Debug for Il2CppClass {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let namespace = self.namespace();
-        let name = self.name();
         f.debug_struct("Il2CppClass")
-            .field("namespace", &namespace)
-            .field("name", &name)
+            .field("namespace", &self.namespace())
+            .field("name", &self.name())
+            .field("declaring_type", &self.declaring_type())
+            .field("generic_arguments", &self.generic_arguments())
             .finish()
     }
 }
 
 impl fmt::Display for Il2CppClass {
+    /// Mirrors beatsaber-hook's `class_standard_name`: a nested type (one
+    /// with no namespace of its own but a
+    /// [`declaring_type`](Self::declaring_type)) prints as `Declaring/
+    /// Nested` - recursing so a type nested several layers deep prints
+    /// every enclosing type - otherwise as `Namespace::Name`. Either way, a
+    /// generic instantiation has its
+    /// [`generic_arguments`](Self::generic_arguments) appended as
+    /// `<Arg1, Arg2>`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let namespace = &*self.namespace();
-        let name = &*self.name();
-        match namespace {
-            "" => f.write_str(name),
-            _ => write!(f, "{}.{}", namespace, name),
+        let namespace = self.namespace();
+        match (namespace.is_empty(), self.declaring_type()) {
+            (true, Some(declaring)) => write!(f, "{declaring}/{}", self.name())?,
+            _ => write!(f, "{namespace}::{}", self.name())?,
         }
+
+        if let [first, rest @ ..] = self.generic_arguments() {
+            write!(f, "<{first}")?;
+            for arg in rest {
+                write!(f, ", {arg}")?;
+            }
+            f.write_str(">")?;
+        }
+
+        Ok(())
     }
 }
 
@@ -1021,6 +1066,48 @@ mod tests {
         fake_class_with_vtable(flags, None, &[], &[], &[], [])
     }
 
+    fn fake_class_named(
+        namespace: &'static CStr,
+        name: &'static CStr,
+        declaring_type: Option<&'static Il2CppClass>,
+    ) -> &'static Il2CppClass {
+        let mut raw: raw::Il2CppClass = unsafe { mem::zeroed() };
+        raw.namespaze = namespace.as_ptr();
+        raw.name = name.as_ptr();
+        raw.declaringType = match declaring_type {
+            Some(d) => d.raw() as *const raw::Il2CppClass as *mut raw::Il2CppClass,
+            None => ptr::null_mut(),
+        };
+        unsafe { Il2CppClass::wrap_ptr(leak(raw)) }.unwrap()
+    }
+
+    /// A fake generic instantiation (like `List<int>`'s `generic_class`) -
+    /// only sets up `context.class_inst`, the only part
+    /// [`Il2CppClass::generic_arguments`] reads when it's present.
+    fn fake_generic_class(type_args: &'static [*const raw::Il2CppType]) -> raw::Il2CppGenericClass {
+        let inst = leak(raw::Il2CppGenericInst {
+            type_argc: type_args.len() as u32,
+            type_argv: type_args.as_ptr().cast_mut(),
+        });
+        raw::Il2CppGenericClass {
+            type_: ptr::null(),
+            context: raw::Il2CppGenericContext {
+                class_inst: inst,
+                method_inst: ptr::null(),
+            },
+            cached_class: ptr::null_mut(),
+        }
+    }
+
+    /// A fake `int` - builtin types are the only ones [`Il2CppType::name`]
+    /// can resolve without a live runtime (see the `param_distance` tests'
+    /// note below for why non-builtin type/class resolution can't be faked).
+    fn fake_type_i4() -> &'static raw::Il2CppType {
+        let mut ty: raw::Il2CppType = unsafe { mem::zeroed() };
+        ty.set_type(raw::Il2CppTypeEnum_IL2CPP_TYPE_I4);
+        leak(ty)
+    }
+
     #[test]
     fn is_interface_reflects_type_attribute_interface_flag() {
         assert!(!fake_class(0).is_interface());
@@ -1134,6 +1221,59 @@ mod tests {
         let class = fake_class(0); // implements nothing
 
         assert!(class.find_method_by_vtable(iface, 0).is_none());
+    }
+
+    #[test]
+    fn declaring_type_is_none_without_one() {
+        assert!(fake_class(0).declaring_type().is_none());
+    }
+
+    #[test]
+    fn declaring_type_reads_the_enclosing_class() {
+        let outer = fake_class_named(c"UnityEngine", c"Outer", None);
+        let inner = fake_class_named(c"", c"Inner", Some(outer));
+
+        assert_eq!(inner.declaring_type(), Some(outer));
+    }
+
+    #[test]
+    fn display_uses_namespace_and_name() {
+        let class = fake_class_named(c"UnityEngine", c"Transform", None);
+        assert_eq!(class.to_string(), "UnityEngine::Transform");
+    }
+
+    #[test]
+    fn display_uses_declaring_type_for_a_nested_type_with_no_namespace() {
+        // A nested type has no namespace of its own - il2cpp only puts one
+        // on the outermost enclosing type.
+        let outer = fake_class_named(c"UnityEngine", c"Outer", None);
+        let inner = fake_class_named(c"", c"Inner", Some(outer));
+
+        assert_eq!(inner.to_string(), "UnityEngine::Outer/Inner");
+    }
+
+    #[test]
+    fn generic_arguments_empty_without_a_generic_class() {
+        assert!(fake_class(0).generic_arguments().is_empty());
+    }
+
+    #[test]
+    fn generic_arguments_reads_the_class_instantiation() {
+        let arg = fake_type_i4();
+        let type_args = leak_slice(vec![arg as *const raw::Il2CppType]);
+        let generic_class = leak(fake_generic_class(type_args));
+
+        let mut raw: raw::Il2CppClass = unsafe { mem::zeroed() };
+        raw.namespaze = c"System.Collections.Generic".as_ptr();
+        raw.name = c"List`1".as_ptr();
+        raw.generic_class =
+            generic_class as *const raw::Il2CppGenericClass as *mut raw::Il2CppGenericClass;
+        let class = unsafe { Il2CppClass::wrap_ptr(leak(raw)) }.unwrap();
+
+        let args = class.generic_arguments();
+        assert_eq!(args.len(), 1);
+        assert_eq!(args[0].name(), "int");
+        assert_eq!(class.to_string(), "System.Collections.Generic::List`1<int>");
     }
 
     // `param_distance` only has two branches reachable without a live
