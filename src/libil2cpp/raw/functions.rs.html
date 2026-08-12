@@ -50,36 +50,37 @@
 <a href=#50 id=50 data-nosnippet>50</a>    <span class="kw">pub fn </span>runtime_invoke(method: <span class="kw-2">&amp;</span>MethodInfo, instance: <span class="kw-2">*mut </span>c_void, params: <span class="kw-2">*mut *mut </span>c_void, exception: <span class="kw-2">&amp;mut </span><span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;mut </span>Il2CppException&gt;) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Il2CppObject&gt;;
 <a href=#51 id=51 data-nosnippet>51</a>    <span class="kw">pub fn </span>string_new_len(s: <span class="kw-2">*const </span>c_char, len: u32) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Il2CppString;
 <a href=#52 id=52 data-nosnippet>52</a>    <span class="kw">pub fn </span>raise_exception(exc: <span class="kw-2">&amp;</span>Il2CppException) -&gt; !;
-<a href=#53 id=53 data-nosnippet>53</a>    <span class="kw">pub fn </span>resolve_icall(name: <span class="kw-2">*const </span>c_char) -&gt; Il2CppMethodPointer;
-<a href=#54 id=54 data-nosnippet>54</a>    <span class="kw">pub fn </span>object_new(class: <span class="kw-2">&amp;</span>Il2CppClass) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Il2CppObject;
-<a href=#55 id=55 data-nosnippet>55</a>
-<a href=#56 id=56 data-nosnippet>56</a>    <span class="kw">pub fn </span>thread_current() -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Il2CppThread&gt;;
-<a href=#57 id=57 data-nosnippet>57</a>    <span class="kw">pub fn </span>thread_attach(domain: <span class="kw-2">&amp;</span>Il2CppDomain) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Il2CppThread&gt;;
-<a href=#58 id=58 data-nosnippet>58</a>    <span class="kw">pub fn </span>thread_detach(thread: <span class="kw-2">&amp;</span>Il2CppThread);
-<a href=#59 id=59 data-nosnippet>59</a>
-<a href=#60 id=60 data-nosnippet>60</a>    <span class="comment">// do these need to be const or mut?
-<a href=#61 id=61 data-nosnippet>61</a>    </span><span class="kw">pub fn </span>value_box(klass: <span class="kw-2">*const </span>Il2CppClass, data: <span class="kw-2">*const </span>c_void) -&gt; <span class="kw-2">*mut </span>Il2CppObject;
-<a href=#62 id=62 data-nosnippet>62</a>    <span class="kw">pub fn </span>object_unbox(obj: <span class="kw-2">*const </span>Il2CppObject) -&gt; <span class="kw-2">*const </span>c_void;
-<a href=#63 id=63 data-nosnippet>63</a>
-<a href=#64 id=64 data-nosnippet>64</a>    <span class="comment">// Boehm GC functions - exported on every supported il2cpp version.
-<a href=#65 id=65 data-nosnippet>65</a>    </span><span class="kw">pub fn </span>gc_free_fixed(obj: <span class="kw-2">*mut </span>c_void);
-<a href=#66 id=66 data-nosnippet>66</a>    <span class="comment">// Only exported directly on il2cpp_v29/v31 - on unity2018/il2cpp_v24 it
-<a href=#67 id=67 data-nosnippet>67</a>    // has to be found by xref instead (see `crate::raw::GcFunctions`).
-<a href=#68 id=68 data-nosnippet>68</a>    </span><span class="attr">#[cfg(any(feature = <span class="string">"il2cpp_v29"</span>, feature = <span class="string">"il2cpp_v31"</span>))]
-<a href=#69 id=69 data-nosnippet>69</a>    </span><span class="kw">pub fn </span>gc_alloc_fixed(size: usize) -&gt; <span class="kw-2">*mut </span>c_void;
-<a href=#70 id=70 data-nosnippet>70</a>}
-<a href=#71 id=71 data-nosnippet>71</a>
-<a href=#72 id=72 data-nosnippet>72</a><span class="doccomment">/// Resolves the runtime address of an exported libil2cpp symbol (e.g.
-<a href=#73 id=73 data-nosnippet>73</a>/// `b"il2cpp_domain_get"`).
-<a href=#74 id=74 data-nosnippet>74</a>///
-<a href=#75 id=75 data-nosnippet>75</a>/// Unlike the functions generated above, this hands back the raw address
-<a href=#76 id=76 data-nosnippet>76</a>/// rather than a callable wrapper - it's meant for xref use, where a known
-<a href=#77 id=77 data-nosnippet>77</a>/// symbol is used as a disassembly starting point to locate a function that
-<a href=#78 id=78 data-nosnippet>78</a>/// isn't itself exported.
-<a href=#79 id=79 data-nosnippet>79</a></span><span class="attr">#[allow(unused)]
-<a href=#80 id=80 data-nosnippet>80</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>symbol_addr(name: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Option</span>&lt;usize&gt; {
-<a href=#81 id=81 data-nosnippet>81</a>    <span class="kw">unsafe </span>{ LIBIL2CPP.get::&lt;<span class="kw-2">*const </span>()&gt;(name) }
-<a href=#82 id=82 data-nosnippet>82</a>        .ok()
-<a href=#83 id=83 data-nosnippet>83</a>        .map(|sym| <span class="kw-2">*</span>sym <span class="kw">as </span>usize)
-<a href=#84 id=84 data-nosnippet>84</a>}
+<a href=#53 id=53 data-nosnippet>53</a>    <span class="kw">pub fn </span>format_exception(exc: <span class="kw-2">&amp;</span>Il2CppException, message: <span class="kw-2">*mut </span>c_char, message_size: i32);
+<a href=#54 id=54 data-nosnippet>54</a>    <span class="kw">pub fn </span>resolve_icall(name: <span class="kw-2">*const </span>c_char) -&gt; Il2CppMethodPointer;
+<a href=#55 id=55 data-nosnippet>55</a>    <span class="kw">pub fn </span>object_new(class: <span class="kw-2">&amp;</span>Il2CppClass) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Il2CppObject;
+<a href=#56 id=56 data-nosnippet>56</a>
+<a href=#57 id=57 data-nosnippet>57</a>    <span class="kw">pub fn </span>thread_current() -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Il2CppThread&gt;;
+<a href=#58 id=58 data-nosnippet>58</a>    <span class="kw">pub fn </span>thread_attach(domain: <span class="kw-2">&amp;</span>Il2CppDomain) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw-2">mut </span>Il2CppThread&gt;;
+<a href=#59 id=59 data-nosnippet>59</a>    <span class="kw">pub fn </span>thread_detach(thread: <span class="kw-2">&amp;</span>Il2CppThread);
+<a href=#60 id=60 data-nosnippet>60</a>
+<a href=#61 id=61 data-nosnippet>61</a>    <span class="comment">// do these need to be const or mut?
+<a href=#62 id=62 data-nosnippet>62</a>    </span><span class="kw">pub fn </span>value_box(klass: <span class="kw-2">*const </span>Il2CppClass, data: <span class="kw-2">*const </span>c_void) -&gt; <span class="kw-2">*mut </span>Il2CppObject;
+<a href=#63 id=63 data-nosnippet>63</a>    <span class="kw">pub fn </span>object_unbox(obj: <span class="kw-2">*const </span>Il2CppObject) -&gt; <span class="kw-2">*const </span>c_void;
+<a href=#64 id=64 data-nosnippet>64</a>
+<a href=#65 id=65 data-nosnippet>65</a>    <span class="comment">// Boehm GC functions - exported on every supported il2cpp version.
+<a href=#66 id=66 data-nosnippet>66</a>    </span><span class="kw">pub fn </span>gc_free_fixed(obj: <span class="kw-2">*mut </span>c_void);
+<a href=#67 id=67 data-nosnippet>67</a>    <span class="comment">// Only exported directly on il2cpp_v29/v31 - on unity2018/il2cpp_v24 it
+<a href=#68 id=68 data-nosnippet>68</a>    // has to be found by xref instead (see `crate::raw::GcFunctions`).
+<a href=#69 id=69 data-nosnippet>69</a>    </span><span class="attr">#[cfg(any(feature = <span class="string">"il2cpp_v29"</span>, feature = <span class="string">"il2cpp_v31"</span>))]
+<a href=#70 id=70 data-nosnippet>70</a>    </span><span class="kw">pub fn </span>gc_alloc_fixed(size: usize) -&gt; <span class="kw-2">*mut </span>c_void;
+<a href=#71 id=71 data-nosnippet>71</a>}
+<a href=#72 id=72 data-nosnippet>72</a>
+<a href=#73 id=73 data-nosnippet>73</a><span class="doccomment">/// Resolves the runtime address of an exported libil2cpp symbol (e.g.
+<a href=#74 id=74 data-nosnippet>74</a>/// `b"il2cpp_domain_get"`).
+<a href=#75 id=75 data-nosnippet>75</a>///
+<a href=#76 id=76 data-nosnippet>76</a>/// Unlike the functions generated above, this hands back the raw address
+<a href=#77 id=77 data-nosnippet>77</a>/// rather than a callable wrapper - it's meant for xref use, where a known
+<a href=#78 id=78 data-nosnippet>78</a>/// symbol is used as a disassembly starting point to locate a function that
+<a href=#79 id=79 data-nosnippet>79</a>/// isn't itself exported.
+<a href=#80 id=80 data-nosnippet>80</a></span><span class="attr">#[allow(unused)]
+<a href=#81 id=81 data-nosnippet>81</a></span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>symbol_addr(name: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Option</span>&lt;usize&gt; {
+<a href=#82 id=82 data-nosnippet>82</a>    <span class="kw">unsafe </span>{ LIBIL2CPP.get::&lt;<span class="kw-2">*const </span>()&gt;(name) }
+<a href=#83 id=83 data-nosnippet>83</a>        .ok()
+<a href=#84 id=84 data-nosnippet>84</a>        .map(|sym| <span class="kw-2">*</span>sym <span class="kw">as </span>usize)
+<a href=#85 id=85 data-nosnippet>85</a>}
 </code></pre></div></section></main></body></html>
