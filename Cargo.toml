@@ -65,3 +65,7 @@ required-features = ["util", "flamingo"]
 name = "gc_alloc"
 crate-type = ["cdylib"]
 required-features = ["util", "xref"]
+[[example]]
+name = "thread"
+crate-type = ["cdylib"]
+required-features = ["util"]

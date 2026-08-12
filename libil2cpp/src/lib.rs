@@ -124,6 +124,7 @@ mod gc_alloc;
 mod parameter_info;
 pub mod raw;
 mod string;
+pub mod thread;
 mod ty;
 mod typecheck;
 

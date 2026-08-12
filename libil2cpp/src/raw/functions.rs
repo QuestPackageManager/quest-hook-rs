@@ -9,7 +9,7 @@ use std::sync::{LazyLock, OnceLock};
 use super::{
     FieldInfo, Il2CppArray, Il2CppAssembly, Il2CppClass, Il2CppDomain, Il2CppException,
     Il2CppImage, Il2CppMethodPointer, Il2CppObject, Il2CppReflectionMethod, Il2CppReflectionType,
-    Il2CppString, Il2CppType, MethodInfo,
+    Il2CppString, Il2CppThread, Il2CppType, MethodInfo,
 };
 // https://katyscode.wordpress.com/2020/12/27/il2cpp-part-2/
 
@@ -50,6 +50,10 @@ il2cpp_functions! { pub IL2CPP_BINARY =>
     pub fn raise_exception(exc: &Il2CppException) -> !;
     pub fn resolve_icall(name: *const c_char) -> Il2CppMethodPointer;
     pub fn object_new(class: &Il2CppClass) -> &'static mut Il2CppObject;
+
+    pub fn thread_current() -> Option<&'static mut Il2CppThread>;
+    pub fn thread_attach(domain: &Il2CppDomain) -> Option<&'static mut Il2CppThread>;
+    pub fn thread_detach(thread: &Il2CppThread);
 
     // do these need to be const or mut?
     pub fn value_box(klass: *const Il2CppClass, data: *const c_void) -> *mut Il2CppObject;
