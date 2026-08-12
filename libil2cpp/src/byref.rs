@@ -5,6 +5,8 @@ use crate::{Argument, Returned, Type};
 
 /// TODO: Add lifetime param
 /// Wrapper type which implies the type is ``ByRef`` managed lifetime
+///
+/// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/byref.hpp>
 #[repr(transparent)]
 pub struct ByRef<T>(*mut T)
 where
