@@ -18,7 +18,7 @@ impl FieldInfo {
     where
         A: Argument,
     {
-        assert!(A::matches(self.ty()));
+        debug_assert!(A::matches(self.ty()), "A does not match {self:?}'s type");
         unsafe { self.store_unchecked(instance, val) };
     }
 
@@ -38,7 +38,10 @@ impl FieldInfo {
     where
         T: Type,
     {
-        assert!(T::class().is_assignable_from(self.ty().class()));
+        debug_assert!(
+            T::class().is_assignable_from(self.ty().class()),
+            "T does not match {self:?}'s type"
+        );
         unsafe { self.load_unchecked::<T>(instance) }
     }
 

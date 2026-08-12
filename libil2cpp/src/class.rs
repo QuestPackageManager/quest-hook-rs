@@ -512,7 +512,7 @@ impl Il2CppClass {
     where
         for<'a> T: Type<Held<'a> = Option<&'a mut T>>,
     {
-        assert!(T::class() == self);
+        debug_assert!(T::class() == self, "T is not {self}");
         unsafe {
             let object = raw::object_new(self.raw());
             transmute(object)

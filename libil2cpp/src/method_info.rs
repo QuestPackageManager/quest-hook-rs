@@ -42,9 +42,9 @@ impl MethodInfo {
         A: Arguments<N>,
         R: Returned,
     {
-        assert!(T::matches_method(self));
-        assert!(A::matches_method(self));
-        assert!(R::matches_method(self));
+        debug_assert!(T::matches_method(self));
+        debug_assert!(A::matches_method(self));
+        debug_assert!(R::matches_method(self));
 
         unsafe { self.invoke_unchecked(this, args) }
     }
@@ -216,6 +216,13 @@ impl MethodInfo {
         &self,
         classes: &[&'static Il2CppClass],
     ) -> Result<Option<&'static Self>> {
+        debug_assert!(self.is_generic(), "self.is_generic() returned false");
+        debug_assert_eq!(
+            classes.len(),
+            self.generic_parameter_count() as usize,
+            "wrong number of generic arguments for {self}"
+        );
+
         match self.reflection_object().make_generic_with(classes) {
             Ok(Some(refl)) => Ok(Some(unsafe {
                 Self::wrap(raw::method_get_from_reflection(refl.raw()))
@@ -297,6 +304,8 @@ impl Il2CppReflectionMethod {
     /// Instantiates a generic method template with generic arguments found
     /// at runtime (e.g. via [`Il2CppClass::find`](crate::Il2CppClass::find))
     /// rather than a compile-time `G: Generics`.
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/src/types.cpp#L113-L133>
     pub fn make_generic_with(&self, classes: &[&'static Il2CppClass]) -> Result<Option<&Self>> {
         let make_generic = self
             .class()
