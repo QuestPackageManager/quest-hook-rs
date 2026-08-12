@@ -1,0 +1,11 @@
+error[E0308]: mismatched types
+  --> tests/ui/hook_typecheck/wrong_parameter_type.rs:38:8
+   |
+38 | #[hook(MyClass::MyMethod)]
+   | -------^^^^^^^^^^^^^^^^^--
+   | |      |
+   | |      expected fn pointer, found fn item
+   | expected because of the type of the constant
+   |
+   = note: expected fn pointer `for<'a, 'b> fn(&'a mut quest_hook::libil2cpp::Il2CppObject, &'b mut quest_hook::libil2cpp::Il2CppString) -> bool`
+                 found fn item `for<'a, 'b> fn(&'a mut quest_hook::libil2cpp::Il2CppObject, &'b mut quest_hook::libil2cpp::Il2CppObject) -> bool {MyClass::MyMethod}`

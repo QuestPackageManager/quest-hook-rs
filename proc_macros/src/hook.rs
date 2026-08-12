@@ -5,27 +5,54 @@ use quote::{format_ident, quote, quote_spanned, ToTokens};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 use syn::{
-    Abi, Attribute, Error, FnArg, GenericParam, Ident, ItemFn, LitStr, Pat, PatType, ReturnType,
-    Token, Type, TypeTuple,
+    Abi, Attribute, Error, FnArg, GenericParam, Ident, ItemFn, LitStr, Pat, PatType, Path,
+    ReturnType, Token, Type, TypeTuple,
 };
 
-/// The parsed argument list of a `#[hook(...)]` attribute: the three
-/// required target identifiers, followed by any number of optional
-/// `key = "value"` arguments.
-pub struct HookArgs {
-    namespace: LitStr,
-    class: LitStr,
-    method: LitStr,
-    extra: Vec<HookArg>,
+/// The parsed argument list of a `#[hook(...)]` attribute: either the three
+/// required target identifiers, or (mutually exclusively) a single path to a
+/// real method on a class, e.g. `SceneManager::SetActiveScene` - either way
+/// followed by any number of optional `key = "value"` arguments.
+pub enum HookArgs {
+    /// `#[hook("Namespace", "Class", "Method", ...)]`
+    Explicit {
+        namespace: LitStr,
+        class: LitStr,
+        method: LitStr,
+        extra: Vec<HookArg>,
+    },
+    /// `#[hook(SomeClass::method, ...)]`
+    Target { target: Path, extra: Vec<HookArg> },
 }
 
 impl Parse for HookArgs {
     fn parse(input: ParseStream<'_>) -> Result<Self, Error> {
-        let namespace: LitStr = input.parse()?;
-        input.parse::<Token![,]>()?;
-        let class: LitStr = input.parse()?;
-        input.parse::<Token![,]>()?;
-        let method: LitStr = input.parse()?;
+        enum Leading {
+            Explicit {
+                namespace: LitStr,
+                class: LitStr,
+                method: LitStr,
+            },
+            Target(Path),
+        }
+
+        // a string literal starts the three-identifier form; anything else
+        // (an identifier or path) must be a path to a method to target
+        // instead
+        let leading = if input.peek(LitStr) {
+            let namespace: LitStr = input.parse()?;
+            input.parse::<Token![,]>()?;
+            let class: LitStr = input.parse()?;
+            input.parse::<Token![,]>()?;
+            let method: LitStr = input.parse()?;
+            Leading::Explicit {
+                namespace,
+                class,
+                method,
+            }
+        } else {
+            Leading::Target(input.parse()?)
+        };
 
         let mut extra = Vec::new();
         while input.peek(Token![,]) {
@@ -36,11 +63,18 @@ impl Parse for HookArgs {
             extra.push(input.parse()?);
         }
 
-        Ok(Self {
-            namespace,
-            class,
-            method,
-            extra,
+        Ok(match leading {
+            Leading::Explicit {
+                namespace,
+                class,
+                method,
+            } => Self::Explicit {
+                namespace,
+                class,
+                method,
+                extra,
+            },
+            Leading::Target(target) => Self::Target { target, extra },
         })
     }
 }
@@ -54,6 +88,7 @@ pub fn expand(args: &HookArgs, input: ItemFn) -> Result<TokenStream, Error> {
     let struct_impl = metadata.struct_impl();
     let static_def = metadata.static_def();
     let trait_impl = metadata.trait_impl();
+    let method_check = metadata.method_check();
 
     let ts = quote! {
         #outer_fn
@@ -61,13 +96,14 @@ pub fn expand(args: &HookArgs, input: ItemFn) -> Result<TokenStream, Error> {
         #struct_impl
         #static_def
         #trait_impl
+        #method_check
     };
     Ok(ts.into())
 }
 
 /// A single optional `key = "value"` argument in a `#[hook(...)]`
-/// attribute, following the three required target identifiers.
-enum HookArg {
+/// attribute, following the target identifiers.
+pub enum HookArg {
     /// Overrides the hook's own namespace
     Namespace(LitStr),
     /// A `Priority::before` filter
@@ -156,10 +192,49 @@ impl HookFilter {
     }
 }
 
+/// Where this hook's target method is: either its namespace/class/method
+/// given directly as string literals, or a path to the real method on a
+/// class implementing `libil2cpp::Type`, e.g. `SceneManager::SetActiveScene`.
+/// `class_path` (`SceneManager`) supplies the namespace/class name and
+/// `method_name` (`"SetActiveScene"`) the method name, while this hook's
+/// declared types get checked against `method_path`'s actual signature (see
+/// [`Metadata::method_check`]).
+enum Location {
+    Explicit {
+        namespace: String,
+        class: String,
+        method: String,
+    },
+    Method {
+        class_path: Path,
+        method_path: Path,
+        method_name: String,
+    },
+}
+
+/// Splits `path` (e.g. `SceneManager::SetActiveScene`) into its class
+/// prefix (`SceneManager`) and final method segment (`SetActiveScene`).
+fn split_method_path(path: &Path) -> Result<(Path, Ident), Error> {
+    let mut class_path = path.clone();
+    let Some(last) = class_path.segments.pop() else {
+        return Err(Error::new_spanned(path, "expected a path to a method"));
+    };
+    // `pop` leaves the `::` that used to separate `last` from the rest
+    // dangling as trailing punctuation
+    class_path.segments.pop_punct();
+
+    if class_path.segments.is_empty() {
+        return Err(Error::new_spanned(
+            path,
+            "expected a path to a method on a class, e.g. `SceneManager::SetActiveScene`",
+        ));
+    }
+
+    Ok((class_path, last.into_value().ident))
+}
+
 pub struct Metadata {
-    namespace: String,
-    class: String,
-    method: String,
+    location: Location,
     /// Overrides the hook's own namespace; defaults to the crate name
     hook_namespace: Option<String>,
     /// `Priority::before` filters
@@ -171,15 +246,38 @@ pub struct Metadata {
 
 impl Metadata {
     fn new(args: &HookArgs, input: ItemFn) -> Result<Self, Error> {
-        let namespace = args.namespace.value();
-        let class = args.class.value();
-        let method = args.method.value();
+        let (location, extra) = match args {
+            HookArgs::Explicit {
+                namespace,
+                class,
+                method,
+                extra,
+            } => (
+                Location::Explicit {
+                    namespace: namespace.value(),
+                    class: class.value(),
+                    method: method.value(),
+                },
+                extra,
+            ),
+            HookArgs::Target { target, extra } => {
+                let (class_path, method) = split_method_path(target)?;
+                (
+                    Location::Method {
+                        class_path,
+                        method_path: target.clone(),
+                        method_name: method.to_string(),
+                    },
+                    extra,
+                )
+            }
+        };
 
         let mut hook_namespace = None;
         let mut before = Vec::new();
         let mut after = Vec::new();
 
-        for arg in &args.extra {
+        for arg in extra {
             match arg {
                 HookArg::Namespace(value) => {
                     if hook_namespace.is_some() {
@@ -193,14 +291,54 @@ impl Metadata {
         }
 
         Ok(Self {
-            namespace,
-            class,
-            method,
+            location,
             hook_namespace,
             before,
             after,
             input,
         })
+    }
+
+    /// This hook's target namespace, as a `&'static str` expression - either
+    /// the literal given directly, or `<class_path as
+    /// libil2cpp::Type>::NAMESPACE`
+    fn namespace_expr(&self) -> TokenStream2 {
+        match &self.location {
+            Location::Explicit { namespace, .. } => quote!(#namespace),
+            Location::Method { class_path, .. } => {
+                quote!(<#class_path as ::quest_hook::libil2cpp::Type>::NAMESPACE)
+            }
+        }
+    }
+
+    /// This hook's target class name, as a `&'static str` expression -
+    /// either the literal given directly, or
+    /// `<class_path as libil2cpp::Type>::CLASS_NAME`
+    fn class_expr(&self) -> TokenStream2 {
+        match &self.location {
+            Location::Explicit { class, .. } => quote!(#class),
+            Location::Method { class_path, .. } => {
+                quote!(<#class_path as ::quest_hook::libil2cpp::Type>::CLASS_NAME)
+            }
+        }
+    }
+
+    /// This hook's target method name, as a `&'static str` expression -
+    /// either the literal given directly, or the target path's final
+    /// segment's text
+    fn method_expr(&self) -> TokenStream2 {
+        match &self.location {
+            Location::Explicit { method, .. } => quote!(#method),
+            Location::Method { method_name, .. } => quote!(#method_name),
+        }
+    }
+
+    /// The real method this hook's location was given as a path to, if any
+    fn method_path(&self) -> Option<&Path> {
+        match &self.location {
+            Location::Explicit { .. } => None,
+            Location::Method { method_path, .. } => Some(method_path),
+        }
     }
 
     fn hook_namespace_expr(&self) -> TokenStream2 {
@@ -477,9 +615,9 @@ impl Metadata {
     fn install_fn(&self) -> TokenStream2 {
         let vis = &self.input.vis;
 
-        let namespace = &self.namespace;
-        let class = &self.class;
-        let method = &self.method;
+        let namespace = self.namespace_expr();
+        let class = self.class_expr();
+        let method = self.method_expr();
 
         let this_ty = self.typechecking_this_ty();
         let params_ty = self.typechecking_params_ty();
@@ -606,9 +744,9 @@ impl Metadata {
     fn trait_impl(&self) -> TokenStream2 {
         let struct_name = self.struct_name();
 
-        let namespace = &self.namespace;
-        let class = &self.class;
-        let method = &self.method;
+        let namespace = self.namespace_expr();
+        let class = self.class_expr();
+        let method = self.method_expr();
 
         let this_ty = staticify(self.typechecking_this_ty());
         let params_ty = staticify(self.typechecking_params_ty());
@@ -646,6 +784,21 @@ impl Metadata {
                 }
             }
         }
+    }
+
+    /// Add a compile-time check that this hook's declared types match the target
+    /// method's actual signature, if the target was given as a path to a real
+    /// method instead of as string literals.
+    fn method_check(&self) -> Option<TokenStream2> {
+        let method_path = self.method_path()?;
+
+        let this_ty = self.this_ty().map(|t| quote!(#t,));
+        let params_ty = self.params_ty().map(|t| quote!(#t,));
+        let return_ty = self.return_ty();
+
+        Some(quote! {
+            const _: fn(#this_ty #(#params_ty)*) -> #return_ty = #method_path;
+        })
     }
 }
 
@@ -685,7 +838,7 @@ mod tests {
     use quote::quote;
     use syn::LitStr;
 
-    use super::{HookArgs, HookFilter};
+    use super::{split_method_path, HookArgs, HookFilter};
 
     fn lit(value: &str) -> LitStr {
         LitStr::new(value, proc_macro2::Span::call_site())
@@ -734,10 +887,20 @@ mod tests {
         })
         .unwrap();
 
-        assert_eq!(args.namespace.value(), "MyNamespace");
-        assert_eq!(args.class.value(), "MyClass");
-        assert_eq!(args.method.value(), "MyMethod");
-        assert_eq!(args.extra.len(), 4);
+        match args {
+            HookArgs::Explicit {
+                namespace,
+                class,
+                method,
+                extra,
+            } => {
+                assert_eq!(namespace.value(), "MyNamespace");
+                assert_eq!(class.value(), "MyClass");
+                assert_eq!(method.value(), "MyMethod");
+                assert_eq!(extra.len(), 4);
+            }
+            HookArgs::Target { .. } => panic!("expected Explicit"),
+        }
     }
 
     #[test]
@@ -747,7 +910,10 @@ mod tests {
         })
         .unwrap();
 
-        assert!(args.extra.is_empty());
+        match args {
+            HookArgs::Explicit { extra, .. } => assert!(extra.is_empty()),
+            HookArgs::Target { .. } => panic!("expected Explicit"),
+        }
     }
 
     #[test]
@@ -765,5 +931,65 @@ mod tests {
             "MyNamespace", "MyClass"
         });
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn hook_args_parses_target_form() {
+        let args: HookArgs = syn::parse2(quote! {
+            SceneManager::SetActiveScene,
+            before = "other_hook",
+        })
+        .unwrap();
+
+        match args {
+            HookArgs::Target { target, extra } => {
+                assert_eq!(
+                    quote!(#target).to_string(),
+                    quote!(SceneManager::SetActiveScene).to_string()
+                );
+                assert_eq!(extra.len(), 1);
+            }
+            HookArgs::Explicit { .. } => panic!("expected Target"),
+        }
+    }
+
+    #[test]
+    fn hook_args_target_form_allows_no_optional_arguments() {
+        let args: HookArgs = syn::parse2(quote! { SceneManager::SetActiveScene }).unwrap();
+
+        match args {
+            HookArgs::Target { extra, .. } => assert!(extra.is_empty()),
+            HookArgs::Explicit { .. } => panic!("expected Target"),
+        }
+    }
+
+    #[test]
+    fn split_method_path_splits_class_and_method() {
+        let path: syn::Path = syn::parse2(quote!(SceneManager::SetActiveScene)).unwrap();
+        let (class_path, method) = split_method_path(&path).unwrap();
+
+        assert_eq!(
+            quote!(#class_path).to_string(),
+            quote!(SceneManager).to_string()
+        );
+        assert_eq!(method, "SetActiveScene");
+    }
+
+    #[test]
+    fn split_method_path_splits_multi_segment_class_path() {
+        let path: syn::Path = syn::parse2(quote!(some::SceneManager::SetActiveScene)).unwrap();
+        let (class_path, method) = split_method_path(&path).unwrap();
+
+        assert_eq!(
+            quote!(#class_path).to_string(),
+            quote!(some::SceneManager).to_string()
+        );
+        assert_eq!(method, "SetActiveScene");
+    }
+
+    #[test]
+    fn split_method_path_rejects_single_segment_path() {
+        let path: syn::Path = syn::parse2(quote!(SetActiveScene)).unwrap();
+        assert!(split_method_path(&path).is_err());
     }
 }

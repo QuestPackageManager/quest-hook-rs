@@ -7,7 +7,7 @@ authors = [
 ]
 repository = "https://github.com/StackDoubleFlow/quest-hook-rs.git"
 license = "MIT"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 quest_hook_proc_macros = { path = "../proc_macros" }

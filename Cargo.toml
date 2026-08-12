@@ -32,6 +32,9 @@ tracing-subscriber = { version = "0.3", features = [
     "smallvec",
 ], default-features = false, optional = true }
 
+[dev-dependencies]
+trybuild = "1"
+
 [features]
 default = ["util", "cache", "il2cpp_v31", "bindgen", "inline_hook", "retour"]
 il2cpp_v31 = ["libil2cpp/il2cpp_v31"]
