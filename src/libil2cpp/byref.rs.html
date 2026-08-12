@@ -58,25 +58,25 @@
 <a href=#58 id=58 data-nosnippet>58</a>    <span class="kw">const </span>CLASS_NAME: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str = T::CLASS_NAME;
 <a href=#59 id=59 data-nosnippet>59</a>
 <a href=#60 id=60 data-nosnippet>60</a>    <span class="kw">fn </span>class() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw">crate</span>::Il2CppClass {
-<a href=#61 id=61 data-nosnippet>61</a>        T::class()
+<a href=#61 id=61 data-nosnippet>61</a>        &lt;T <span class="kw">as </span>Type&gt;::class()
 <a href=#62 id=62 data-nosnippet>62</a>    }
 <a href=#63 id=63 data-nosnippet>63</a>
 <a href=#64 id=64 data-nosnippet>64</a>    <span class="kw">fn </span>type_() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw">crate</span>::Il2CppType {
-<a href=#65 id=65 data-nosnippet>65</a>        T::class().this_arg_ty()
+<a href=#65 id=65 data-nosnippet>65</a>        &lt;T <span class="kw">as </span>Type&gt;::class().this_arg_ty()
 <a href=#66 id=66 data-nosnippet>66</a>    }
 <a href=#67 id=67 data-nosnippet>67</a>
 <a href=#68 id=68 data-nosnippet>68</a>    <span class="kw">fn </span>matches_value_argument(<span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw">crate</span>::Il2CppType) -&gt; bool {
 <a href=#69 id=69 data-nosnippet>69</a>        <span class="bool-val">false
 <a href=#70 id=70 data-nosnippet>70</a>    </span>}
 <a href=#71 id=71 data-nosnippet>71</a>    <span class="kw">fn </span>matches_reference_argument(ty: <span class="kw-2">&amp;</span><span class="kw">crate</span>::Il2CppType) -&gt; bool {
-<a href=#72 id=72 data-nosnippet>72</a>        T::class().this_arg_ty() == ty
+<a href=#72 id=72 data-nosnippet>72</a>        &lt;T <span class="kw">as </span>Type&gt;::class().this_arg_ty() == ty
 <a href=#73 id=73 data-nosnippet>73</a>            || ty.is_ref() &amp;&amp; ty.class().is_assignable_from(&lt;T <span class="kw">as </span><span class="kw">crate</span>::Type&gt;::class())
 <a href=#74 id=74 data-nosnippet>74</a>    }
 <a href=#75 id=75 data-nosnippet>75</a>    <span class="kw">fn </span>matches_value_parameter(<span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw">crate</span>::Il2CppType) -&gt; bool {
 <a href=#76 id=76 data-nosnippet>76</a>        <span class="bool-val">false
 <a href=#77 id=77 data-nosnippet>77</a>    </span>}
 <a href=#78 id=78 data-nosnippet>78</a>    <span class="kw">fn </span>matches_reference_parameter(ty: <span class="kw-2">&amp;</span><span class="kw">crate</span>::Il2CppType) -&gt; bool {
-<a href=#79 id=79 data-nosnippet>79</a>        T::class().this_arg_ty() == ty
+<a href=#79 id=79 data-nosnippet>79</a>        &lt;T <span class="kw">as </span>Type&gt;::class().this_arg_ty() == ty
 <a href=#80 id=80 data-nosnippet>80</a>            || ty.is_ref() &amp;&amp; &lt;T <span class="kw">as </span><span class="kw">crate</span>::Type&gt;::class().is_assignable_from(ty.class())
 <a href=#81 id=81 data-nosnippet>81</a>    }
 <a href=#82 id=82 data-nosnippet>82</a>}

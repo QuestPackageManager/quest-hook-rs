@@ -178,41 +178,44 @@
 <a href=#178 id=178 data-nosnippet>178</a>    <span class="kw">fn </span>matches(ty: <span class="kw-2">&amp;</span><span class="kw">crate</span>::Il2CppType) -&gt; bool {
 <a href=#179 id=179 data-nosnippet>179</a>        &lt;<span class="self">Self </span><span class="kw">as </span><span class="kw">crate</span>::Type&gt;::matches_value_argument(ty)
 <a href=#180 id=180 data-nosnippet>180</a>    }
-<a href=#181 id=181 data-nosnippet>181</a>    <span class="kw">fn </span>invokable(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">*mut </span>::std::ffi::c_void {
-<a href=#182 id=182 data-nosnippet>182</a>        (<span class="self">self </span><span class="kw">as </span><span class="kw-2">*mut </span><span class="self">Self</span>).cast::&lt;::std::ffi::c_void&gt;()
+<a href=#181 id=181 data-nosnippet>181</a>    <span class="kw">fn </span>class() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span><span class="kw">crate</span>::Il2CppClass {
+<a href=#182 id=182 data-nosnippet>182</a>        &lt;<span class="self">Self </span><span class="kw">as </span><span class="kw">crate</span>::Type&gt;::class()
 <a href=#183 id=183 data-nosnippet>183</a>    }
-<a href=#184 id=184 data-nosnippet>184</a>}
-<a href=#185 id=185 data-nosnippet>185</a><span class="kw">unsafe impl</span>&lt;<span class="kw">const </span>N: usize&gt; <span class="kw">crate</span>::Parameter <span class="kw">for </span>ValueTypePadding&lt;N&gt; {
-<a href=#186 id=186 data-nosnippet>186</a>    <span class="kw">type </span>Actual = <span class="self">Self</span>;
-<a href=#187 id=187 data-nosnippet>187</a>    <span class="kw">fn </span>matches(ty: <span class="kw-2">&amp;</span><span class="kw">crate</span>::Il2CppType) -&gt; bool {
-<a href=#188 id=188 data-nosnippet>188</a>        &lt;<span class="self">Self </span><span class="kw">as </span><span class="kw">crate</span>::Type&gt;::matches_value_parameter(ty)
-<a href=#189 id=189 data-nosnippet>189</a>    }
-<a href=#190 id=190 data-nosnippet>190</a>    <span class="kw">fn </span>from_actual(actual: <span class="self">Self</span>::Actual) -&gt; <span class="self">Self </span>{
-<a href=#191 id=191 data-nosnippet>191</a>        actual
+<a href=#184 id=184 data-nosnippet>184</a>    <span class="kw">fn </span>invokable(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">*mut </span>::std::ffi::c_void {
+<a href=#185 id=185 data-nosnippet>185</a>        (<span class="self">self </span><span class="kw">as </span><span class="kw-2">*mut </span><span class="self">Self</span>).cast::&lt;::std::ffi::c_void&gt;()
+<a href=#186 id=186 data-nosnippet>186</a>    }
+<a href=#187 id=187 data-nosnippet>187</a>}
+<a href=#188 id=188 data-nosnippet>188</a><span class="kw">unsafe impl</span>&lt;<span class="kw">const </span>N: usize&gt; <span class="kw">crate</span>::Parameter <span class="kw">for </span>ValueTypePadding&lt;N&gt; {
+<a href=#189 id=189 data-nosnippet>189</a>    <span class="kw">type </span>Actual = <span class="self">Self</span>;
+<a href=#190 id=190 data-nosnippet>190</a>    <span class="kw">fn </span>matches(ty: <span class="kw-2">&amp;</span><span class="kw">crate</span>::Il2CppType) -&gt; bool {
+<a href=#191 id=191 data-nosnippet>191</a>        &lt;<span class="self">Self </span><span class="kw">as </span><span class="kw">crate</span>::Type&gt;::matches_value_parameter(ty)
 <a href=#192 id=192 data-nosnippet>192</a>    }
-<a href=#193 id=193 data-nosnippet>193</a>    <span class="kw">fn </span>into_actual(<span class="self">self</span>) -&gt; <span class="self">Self</span>::Actual {
-<a href=#194 id=194 data-nosnippet>194</a>        <span class="self">self
-<a href=#195 id=195 data-nosnippet>195</a>    </span>}
-<a href=#196 id=196 data-nosnippet>196</a>}
-<a href=#197 id=197 data-nosnippet>197</a><span class="kw">unsafe impl</span>&lt;<span class="kw">const </span>N: usize&gt; <span class="kw">crate</span>::Returned <span class="kw">for </span>ValueTypePadding&lt;N&gt; {
-<a href=#198 id=198 data-nosnippet>198</a>    <span class="kw">type </span>Type = <span class="self">Self</span>;
-<a href=#199 id=199 data-nosnippet>199</a>    <span class="kw">fn </span>matches(ty: <span class="kw-2">&amp;</span><span class="kw">crate</span>::Il2CppType) -&gt; bool {
-<a href=#200 id=200 data-nosnippet>200</a>        &lt;<span class="self">Self </span><span class="kw">as </span><span class="kw">crate</span>::Type&gt;::matches_returned(ty)
-<a href=#201 id=201 data-nosnippet>201</a>    }
-<a href=#202 id=202 data-nosnippet>202</a>    <span class="kw">fn </span>from_object(object: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;mut </span><span class="kw">crate</span>::Il2CppObject&gt;) -&gt; <span class="self">Self </span>{
-<a href=#203 id=203 data-nosnippet>203</a>        <span class="kw">unsafe </span>{ <span class="kw">crate</span>::raw::unbox(<span class="kw">crate</span>::WrapRaw::raw(object.unwrap())) }
+<a href=#193 id=193 data-nosnippet>193</a>    <span class="kw">fn </span>from_actual(actual: <span class="self">Self</span>::Actual) -&gt; <span class="self">Self </span>{
+<a href=#194 id=194 data-nosnippet>194</a>        actual
+<a href=#195 id=195 data-nosnippet>195</a>    }
+<a href=#196 id=196 data-nosnippet>196</a>    <span class="kw">fn </span>into_actual(<span class="self">self</span>) -&gt; <span class="self">Self</span>::Actual {
+<a href=#197 id=197 data-nosnippet>197</a>        <span class="self">self
+<a href=#198 id=198 data-nosnippet>198</a>    </span>}
+<a href=#199 id=199 data-nosnippet>199</a>}
+<a href=#200 id=200 data-nosnippet>200</a><span class="kw">unsafe impl</span>&lt;<span class="kw">const </span>N: usize&gt; <span class="kw">crate</span>::Returned <span class="kw">for </span>ValueTypePadding&lt;N&gt; {
+<a href=#201 id=201 data-nosnippet>201</a>    <span class="kw">type </span>Type = <span class="self">Self</span>;
+<a href=#202 id=202 data-nosnippet>202</a>    <span class="kw">fn </span>matches(ty: <span class="kw-2">&amp;</span><span class="kw">crate</span>::Il2CppType) -&gt; bool {
+<a href=#203 id=203 data-nosnippet>203</a>        &lt;<span class="self">Self </span><span class="kw">as </span><span class="kw">crate</span>::Type&gt;::matches_returned(ty)
 <a href=#204 id=204 data-nosnippet>204</a>    }
-<a href=#205 id=205 data-nosnippet>205</a>}
-<a href=#206 id=206 data-nosnippet>206</a><span class="kw">unsafe impl</span>&lt;<span class="kw">const </span>N: usize&gt; <span class="kw">crate</span>::Return <span class="kw">for </span>ValueTypePadding&lt;N&gt; {
-<a href=#207 id=207 data-nosnippet>207</a>    <span class="kw">type </span>Actual = <span class="self">Self</span>;
-<a href=#208 id=208 data-nosnippet>208</a>    <span class="kw">fn </span>matches(ty: <span class="kw-2">&amp;</span><span class="kw">crate</span>::Il2CppType) -&gt; bool {
-<a href=#209 id=209 data-nosnippet>209</a>        &lt;<span class="self">Self </span><span class="kw">as </span><span class="kw">crate</span>::Type&gt;::matches_return(ty)
-<a href=#210 id=210 data-nosnippet>210</a>    }
-<a href=#211 id=211 data-nosnippet>211</a>    <span class="kw">fn </span>into_actual(<span class="self">self</span>) -&gt; <span class="self">Self</span>::Actual {
-<a href=#212 id=212 data-nosnippet>212</a>        <span class="self">self
-<a href=#213 id=213 data-nosnippet>213</a>    </span>}
-<a href=#214 id=214 data-nosnippet>214</a>    <span class="kw">fn </span>from_actual(actual: <span class="self">Self</span>::Actual) -&gt; <span class="self">Self </span>{
-<a href=#215 id=215 data-nosnippet>215</a>        actual
-<a href=#216 id=216 data-nosnippet>216</a>    }
-<a href=#217 id=217 data-nosnippet>217</a>}
+<a href=#205 id=205 data-nosnippet>205</a>    <span class="kw">fn </span>from_object(object: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;mut </span><span class="kw">crate</span>::Il2CppObject&gt;) -&gt; <span class="self">Self </span>{
+<a href=#206 id=206 data-nosnippet>206</a>        <span class="kw">unsafe </span>{ <span class="kw">crate</span>::raw::unbox(<span class="kw">crate</span>::WrapRaw::raw(object.unwrap())) }
+<a href=#207 id=207 data-nosnippet>207</a>    }
+<a href=#208 id=208 data-nosnippet>208</a>}
+<a href=#209 id=209 data-nosnippet>209</a><span class="kw">unsafe impl</span>&lt;<span class="kw">const </span>N: usize&gt; <span class="kw">crate</span>::Return <span class="kw">for </span>ValueTypePadding&lt;N&gt; {
+<a href=#210 id=210 data-nosnippet>210</a>    <span class="kw">type </span>Actual = <span class="self">Self</span>;
+<a href=#211 id=211 data-nosnippet>211</a>    <span class="kw">fn </span>matches(ty: <span class="kw-2">&amp;</span><span class="kw">crate</span>::Il2CppType) -&gt; bool {
+<a href=#212 id=212 data-nosnippet>212</a>        &lt;<span class="self">Self </span><span class="kw">as </span><span class="kw">crate</span>::Type&gt;::matches_return(ty)
+<a href=#213 id=213 data-nosnippet>213</a>    }
+<a href=#214 id=214 data-nosnippet>214</a>    <span class="kw">fn </span>into_actual(<span class="self">self</span>) -&gt; <span class="self">Self</span>::Actual {
+<a href=#215 id=215 data-nosnippet>215</a>        <span class="self">self
+<a href=#216 id=216 data-nosnippet>216</a>    </span>}
+<a href=#217 id=217 data-nosnippet>217</a>    <span class="kw">fn </span>from_actual(actual: <span class="self">Self</span>::Actual) -&gt; <span class="self">Self </span>{
+<a href=#218 id=218 data-nosnippet>218</a>        actual
+<a href=#219 id=219 data-nosnippet>219</a>    }
+<a href=#220 id=220 data-nosnippet>220</a>}
 </code></pre></div></section></main></body></html>

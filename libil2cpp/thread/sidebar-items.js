@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["attach","attached_invoke","spawn_attached"],"struct":["AttachedThread"]};
