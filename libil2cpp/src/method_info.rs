@@ -2,12 +2,13 @@ use std::borrow::Cow;
 use std::ffi::{c_void, CStr};
 use std::mem::transmute;
 use std::ops::{Deref, DerefMut};
+use std::ptr::null_mut;
 use std::{fmt, slice};
 
 use crate::raw::{METHOD_ATTRIBUTE_ABSTRACT, METHOD_ATTRIBUTE_STATIC, METHOD_ATTRIBUTE_VIRTUAL};
 use crate::{
-    raw, Arguments, Gc, Il2CppClass, Il2CppException, Il2CppObject, Il2CppType, ParameterInfo,
-    Returned, ThisArgument, WrapRaw,
+    raw, Arguments, Gc, Generics, Il2CppClass, Il2CppException, Il2CppObject, Il2CppType,
+    ParameterInfo, Returned, ThisArgument, WrapRaw,
 };
 
 #[cfg(feature = "il2cpp_v31")]
@@ -148,6 +149,26 @@ impl MethodInfo {
     pub fn slot(&self) -> u16 {
         self.raw().slot
     }
+
+    /// Instantiates a generic method template with the provided generic
+    /// arguments, returning the resulting concrete method - mirrors
+    /// [`Il2CppClass::make_generic`], via
+    /// [`Il2CppReflectionMethod::make_generic`]
+    /// (`MethodInfo.MakeGenericMethod`).
+    /// 
+    /// https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/src/types.cpp#L328-L363
+    pub fn make_generic<G>(&self) -> Result<Option<&'static Self>>
+    where
+        G: Generics,
+    {
+        match self.reflection_object().make_generic::<G>() {
+            Ok(Some(refl)) => Ok(Some(unsafe {
+                Self::wrap(raw::method_get_from_reflection(refl.raw()))
+            })),
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
 }
 
 unsafe impl WrapRaw for MethodInfo {
@@ -203,6 +224,40 @@ impl Il2CppReflectionMethod {
     /// [`MethodInfo`] which this object represents
     pub fn method_info(&self) -> &MethodInfo {
         unsafe { MethodInfo::wrap(raw::method_get_from_reflection(self.raw())) }
+    }
+
+    /// Instantiates a generic method template with the provided generic
+    /// arguments - mirrors
+    /// [`Il2CppReflectionType::make_generic`](crate::Il2CppReflectionType::make_generic),
+    /// calling `MethodInfo.MakeGenericMethod` via reflection.
+    /// 
+    /// https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/src/types.cpp#L113-L133
+    pub fn make_generic<G>(&self) -> Result<Option<&Self>>
+    where
+        G: Generics,
+    {
+        let generics = G::type_array();
+        let make_generic = self
+            .class()
+            .find_method_unchecked("MakeGenericMethod", 2)
+            .unwrap();
+        let ret = unsafe {
+            make_generic.invoke_raw(
+                null_mut(),
+                [
+                    self as *const Self as *mut c_void,
+                    (generics as *mut raw::Il2CppArray).cast(),
+                ]
+                .as_mut(),
+            )
+        };
+        let obj = match ret {
+            Ok(Some(obj)) => obj,
+            Ok(None) => return Ok(None),
+            Err(e) => return Err(unsafe { Gc::from(Il2CppException::wrap_mut(e)) }),
+        };
+        let method = unsafe { &mut *(obj as *mut raw::Il2CppObject).cast() };
+        Ok(Some(method))
     }
 }
 
