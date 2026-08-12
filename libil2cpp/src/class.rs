@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::ffi::{CStr, CString};
 use std::fmt::Display;
+use std::marker::PhantomData;
 use std::mem::transmute;
 use std::{fmt, ptr, slice, vec};
 
@@ -118,7 +119,15 @@ impl Il2CppClass {
     /// ()`, since a generic method's return type can itself be `T`.
     ///
     /// If more than one method type-checks, the closest match by parameter
-    /// types wins - see [`Self::resolve_method`].
+    /// types wins - see [`MethodLooker`].
+    ///
+    /// This includes methods declared on base classes, so a method declared on
+    /// `MonoBehaviour` can be found by calling this on
+    /// `UnityEngine.MonoBehaviour` or any of its subclasses.
+    ///
+    /// This includes static and instance methods, so a static method declared
+    /// on `MonoBehaviour` can be found by calling this on
+    /// `UnityEngine.MonoBehaviour` or any of its subclasses.
     #[crate::instrument(level = "debug")]
     pub fn find_method<A, G, R, const N: usize>(
         &self,
@@ -129,31 +138,7 @@ impl Il2CppClass {
         G: Generics + 'static,
         R: Returned,
     {
-        #[cfg(feature = "cache")]
-        let key = {
-            let class_key = cache::ClassCacheKey {
-                namespace: self.namespace(),
-                name: self.name(),
-            };
-            let key = cache::MethodCacheKey {
-                class: class_key,
-                name: name.into(),
-                ty: std::any::TypeId::of::<fn(Self, A::Type, G) -> R::Type>(),
-            };
-            if let Some(method) = cache::METHOD_CACHE.with(|c| c.borrow().get(&key).copied()) {
-                debug!("cache hit");
-                return Ok(method);
-            }
-            debug!("cache miss");
-            key
-        };
-
-        let method = self.resolve_method::<A, G, R, N>(name, false)?;
-
-        #[cfg(feature = "cache")]
-        cache::METHOD_CACHE.with(move |c| c.borrow_mut().insert(key.into(), method));
-
-        Ok(method)
+        MethodLooker::<A, G, N>::new(self, name).resolve::<R>(false)
     }
 
     /// Find a `static` method belonging to the class by name, with type
@@ -168,116 +153,19 @@ impl Il2CppClass {
         G: Generics + 'static,
         R: Returned,
     {
-        #[cfg(feature = "cache")]
-        let key = {
-            let class_key = cache::ClassCacheKey {
-                namespace: self.namespace(),
-                name: self.name(),
-            };
-            let key = cache::MethodCacheKey {
-                class: class_key,
-                name: name.into(),
-                ty: std::any::TypeId::of::<fn((), A::Type, G) -> R::Type>(),
-            };
-            if let Some(method) = cache::METHOD_CACHE.with(|c| c.borrow().get(&key).copied()) {
-                debug!("cache hit");
-                return Ok(method);
-            }
-            debug!("cache miss");
-            key
-        };
-
-        let method = self.resolve_method::<A, G, R, N>(name, true)?;
-        debug!("Found method: {}.{}", self, name);
-
-        #[cfg(feature = "cache")]
-        cache::METHOD_CACHE.with(move |c| c.borrow_mut().insert(key.into(), method));
-
-        Ok(method)
+        MethodLooker::<A, G, N>::new(self, name).resolve::<R>(true)
     }
 
-    /// Every method declared on `self` or any of its parents, in hierarchy
-    /// order - the shared traversal [`resolve_method`](Self::resolve_method)
-    /// and [`find_method_callee`](Self::find_method_callee) both walk.
-    fn hierarchy_methods(&self) -> impl Iterator<Item = &'static MethodInfo> + '_ {
-        self.hierarchy().flat_map(|c| c.methods().iter().copied())
-    }
-
-    /// Shared implementation of [`find_method`](Self::find_method) and
-    /// [`find_static_method`](Self::find_static_method)
+    /// Find a method belonging to the class
     ///
-    /// Walks the class hierarchy for methods named `name` with the right
-    /// arity, genericity and (for a non-generic `G`) return type, then picks
-    /// the closest-matching one by [`method_weight`]: an exact match wins
-    /// immediately, otherwise the lowest-scoring candidate does. Never fails
-    /// just because more than one candidate type-checks.
-    fn resolve_method<A, G, R, const N: usize>(
-        &self,
-        name: &str,
-        static_only: bool,
-    ) -> Result<&'static MethodInfo, FindMethodError>
-    where
-        A: Arguments<N>,
-        G: Generics,
-        R: Returned,
-    {
-        let arg_classes = A::classes();
-        let generics = G::classes();
-
-        let mut best: Option<&'static MethodInfo> = None;
-        let mut best_weight = i32::MAX;
-        let mut multiple = false;
-
-        for mi in self.hierarchy_methods() {
-            if mi.name() != name
-                || (static_only && !mi.is_static())
-                || mi.parameters().len() != N
-                || mi.generic_parameter_count() as usize != G::COUNT
-                || (G::COUNT == 0 && !R::matches(mi.return_ty()))
-            {
-                continue;
-            }
-
-            match method_weight::<A, N>(mi, &arg_classes, &generics) {
-                Some(Closeness::Exact) => {
-                    best = Some(mi);
-                    break;
-                }
-                Some(Closeness::Convertible(w)) if w < best_weight => {
-                    multiple = best.is_some();
-                    best_weight = w;
-                    best = Some(mi);
-                }
-                Some(Closeness::Convertible(_)) | None => {}
-            }
-        }
-
-        let Some(best) = best else {
-            return Err(FindMethodError::None(FindMethodParameters {
-                ty_name: self.to_string(),
-                method_name: name.to_string(),
-                parameters: arg_classes.iter().map(|c| c.to_string()).collect(),
-            }));
-        };
-
-        if multiple {
-            debug!(
-                "Multiple overloads of {}.{} type-checked with different weights - picked {}",
-                self, name, best
-            );
-        }
-
-        Ok(best)
-    }
-
-    /// Find a method belonging to the class or its parents by name with type
-    /// checking from a callee perspective
+    /// This is mostly used for finding methods for a hook installation.
     ///
-    /// This is mostly used for finding methods for a hook installation. Uses
-    /// the same [`hierarchy_methods`](Self::hierarchy_methods) walk as
-    /// [`resolve_method`](Self::resolve_method) - a method declared only on
-    /// a base class (e.g. an un-overridden Unity callback) is found the same
-    /// way here as it is by [`find_method`](Self::find_method).
+    /// `T` is the type of the `this` parameter, `P` is the type of the
+    /// parameters, and `R` is the return type.
+    ///
+    /// We use an exact match here because we want to find the method that is
+    /// actually being called, not a method that is compatible with the
+    /// types.
     #[crate::instrument(level = "debug")]
     pub fn find_method_callee<T, P, R>(
         &self,
@@ -290,7 +178,7 @@ impl Il2CppClass {
     {
         debug!("Looking for method: {}", name);
 
-        let mut matching = self.hierarchy_methods().filter(|mi| {
+        let mut matching = self.methods().iter().filter(|mi| {
             debug!("Looking for method: {}", name);
             debug!("mi.name() == name: {}", mi.name() == name);
             debug!("T::matches(mi): {}", T::matches(mi));
@@ -511,6 +399,13 @@ impl Il2CppClass {
         }
 
         None
+    }
+
+    /// Every method declared on `self` or any of its parents, in hierarchy
+    /// order - the traversal
+    /// [`MethodLooker::resolve_caller_method`] walks.
+    fn hierarchy_methods(&self) -> impl Iterator<Item = &'static MethodInfo> + '_ {
+        self.hierarchy().flat_map(|c| c.methods().iter().copied())
     }
 
     /// Instanciates a generic class template with the provided generic
@@ -987,6 +882,149 @@ pub enum FindMethodError {
     Many(Vec<FindMethodParameters>),
 }
 
+/// A caller-side method lookup request - `find_method`/`find_static_method`'s
+/// shared implementation, including the (feature-gated)
+/// [`METHOD_CACHE`](cache::METHOD_CACHE) dance both used to duplicate.
+///
+/// `A`/`G` are the lookup's arguments/generic-method type arguments - see
+/// [`Il2CppClass::find_method`] - captured up front so the cache key and the
+/// actual [`resolve_caller_method`](Self::resolve_caller_method) call always
+/// agree on them; `R` and `static_only` are supplied to
+/// [`resolve`](Self::resolve) instead, since neither affects overload
+/// ranking itself (`method_weight` never looks at either).
+struct MethodLooker<'a, A, G, const N: usize>
+where
+    A: Arguments<N>,
+    G: Generics,
+{
+    class: &'a Il2CppClass,
+    name: &'a str,
+    args: PhantomData<A>,
+    gen_args: PhantomData<G>,
+}
+
+impl<'a, A, G, const N: usize> MethodLooker<'a, A, G, N>
+where
+    A: Arguments<N>,
+    G: Generics + 'static,
+{
+    fn new(class: &'a Il2CppClass, name: &'a str) -> Self {
+        Self {
+            class,
+            name,
+            args: PhantomData,
+            gen_args: PhantomData,
+        }
+    }
+
+    /// Walks `self.class`'s
+    /// [`hierarchy_methods`](Il2CppClass::hierarchy_methods) for methods
+    /// named `self.name` with the right staticness, arity, genericity and
+    /// (for a non-generic `G`) return type, then ranks each one by
+    /// [`method_weight`]: an exact match wins immediately, otherwise the
+    /// lowest-scoring candidate does. Never fails just because more than one
+    /// candidate type-checks - only logged, via `debug!`.
+    fn resolve_caller_method<R: Returned>(
+        &self,
+        static_only: bool,
+    ) -> Result<&'static MethodInfo, FindMethodError> {
+        let arg_classes = A::classes();
+        let generics = G::classes();
+
+        let mut best: Option<&'static MethodInfo> = None;
+        let mut best_weight = i32::MAX;
+        let mut multiple = false;
+
+        for mi in self.class.hierarchy_methods() {
+            let is_candidate = mi.name() == self.name
+                // any method is fine unless the caller specifically asked
+                // for a static one
+                && (mi.is_static() || !static_only)
+                && mi.parameters().len() == N
+                && mi.generic_parameter_count() as usize == G::COUNT
+                // return type must match (or be ignored if the method is generic)
+                && (G::COUNT != 0 || R::matches(mi.return_ty()));
+            if !is_candidate {
+                continue;
+            }
+
+            match method_weight::<A, N>(mi, &arg_classes, &generics) {
+                Some(Closeness::Exact) => {
+                    best = Some(mi);
+                    break;
+                }
+                Some(Closeness::Convertible(w)) if w < best_weight => {
+                    multiple = best.is_some();
+                    best_weight = w;
+                    best = Some(mi);
+                }
+                Some(Closeness::Convertible(_)) | None => {}
+            }
+        }
+
+        let Some(best) = best else {
+            return Err(FindMethodError::None(FindMethodParameters {
+                ty_name: self.class.to_string(),
+                method_name: self.name.to_string(),
+                parameters: arg_classes.iter().map(|c| c.to_string()).collect(),
+            }));
+        };
+
+        if multiple {
+            debug!(
+                "Multiple overloads of {}.{} type-checked with different weights - picked {}",
+                self.class, self.name, best
+            );
+        }
+
+        Ok(best)
+    }
+
+    /// Resolves the request, consulting/populating
+    /// [`METHOD_CACHE`](cache::METHOD_CACHE) first when the `cache` feature
+    /// is enabled.
+    fn resolve<R: Returned>(
+        &self,
+        static_only: bool,
+    ) -> Result<&'static MethodInfo, FindMethodError> {
+        #[cfg(feature = "cache")]
+        let key = {
+            let class_key = cache::ClassCacheKey {
+                namespace: self.class.namespace(),
+                name: self.class.name(),
+            };
+            // `static_only` distinguishes `find_method`/`find_static_method`
+            // in the cache key the same way it distinguishes their behavior:
+            // a marker `this` type (`Il2CppClass` vs `()`) folded into the
+            // encoded `fn` pointer's `TypeId`, matching what the pre-`MethodLooker`
+            // duplicated code did.
+            let ty = if static_only {
+                std::any::TypeId::of::<fn((), A::Type, G) -> R::Type>()
+            } else {
+                std::any::TypeId::of::<fn(Il2CppClass, A::Type, G) -> R::Type>()
+            };
+            let key = cache::MethodCacheKey {
+                class: class_key,
+                name: self.name.into(),
+                ty,
+            };
+            if let Some(method) = cache::METHOD_CACHE.with(|c| c.borrow().get(&key).copied()) {
+                debug!("cache hit");
+                return Ok(method);
+            }
+            debug!("cache miss");
+            key
+        };
+
+        let method = self.resolve_caller_method::<R>(static_only)?;
+
+        #[cfg(feature = "cache")]
+        cache::METHOD_CACHE.with(move |c| c.borrow_mut().insert(key.into(), method));
+
+        Ok(method)
+    }
+}
+
 #[cfg(feature = "cache")]
 mod cache {
     use std::any::TypeId;
@@ -1365,7 +1403,7 @@ mod tests {
     // calls `Il2CppClass::is_assignable_from`, which (once the classes
     // differ) always falls through to the real `class_is_assignable_from`
     // FFI function. Ranking overloads end to end
-    // (`method_weight`/`resolve_method`/`find_method`) also needs
+    // (`method_weight`/`resolve_caller_method`/`find_method`) also needs
     // `Il2CppType::class()`, which always calls `class_from_il2cpp_type` -
     // there's no fake-struct path around either. Both need a live,
     // initialized runtime to exercise safely, the same boundary
@@ -1410,20 +1448,6 @@ mod tests {
         unsafe { MethodInfo::wrap_ptr(leak(raw)) }.unwrap()
     }
 
-    // Unlike the old class-only substitution this replaced,
-    // `method_weight`'s `A::matches_types` gate (needed for the by-ref check
-    // - see its doc comment) calls into a real `Argument::matches` impl for
-    // every parameter that passed substitution, which - like
-    // `Il2CppClass::is_assignable_from` for any non-identical pair -
-    // ultimately calls `Il2CppType::class()`'s `class_from_il2cpp_type` FFI
-    // function even where the two classes involved are actually identical
-    // (there's no pointer-identity fast path before that call the way
-    // `Il2CppClass::is_assignable_from`/`param_distance` have). So only the
-    // out-of-bounds generic-index rejection - which returns before
-    // `matches_types` is ever called - is reachable without a live il2cpp
-    // runtime; everything else needs one, the same boundary the
-    // `param_distance` tests above document hitting.
-
     #[test]
     fn method_weight_none_when_generic_index_out_of_bounds() {
         let concrete = fake_class(0);
@@ -1437,7 +1461,7 @@ mod tests {
 
         // `crate::ValueTypePadding<0>` is only used here as a placeholder
         // `Arguments<1>` - the out-of-bounds index rejects the candidate
-        // before `A::matches_types` (or anything else about `A`) is ever
+        // before `A::matches` (or anything else about `A`) is ever
         // consulted.
         assert_eq!(
             method_weight::<crate::ValueTypePadding<0>, 1>(method, &arg_classes, &generics),

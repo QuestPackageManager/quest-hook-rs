@@ -190,6 +190,9 @@ unsafe impl<const N: usize> crate::Parameter for ValueTypePadding<N> {
     fn matches(ty: &crate::Il2CppType) -> bool {
         <Self as crate::Type>::matches_value_parameter(ty)
     }
+    fn class() -> &'static crate::Il2CppClass {
+        <Self as crate::Type>::class()
+    }
     fn from_actual(actual: Self::Actual) -> Self {
         actual
     }

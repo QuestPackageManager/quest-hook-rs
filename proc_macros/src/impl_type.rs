@@ -354,6 +354,10 @@ impl Input {
                     <Self as #type_trait>::matches_value_parameter(ty)
                 }
 
+                fn class() -> &'static #class_ty {
+                    <Self as #type_trait>::class()
+                }
+
                 fn from_actual(actual: Self::Actual) -> Self {
                     actual
                 }

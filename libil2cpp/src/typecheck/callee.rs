@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::byref::ReffableType;
-use crate::{Builtin, ByRef, Gc, Il2CppType, MethodInfo, RefType, Type};
+use crate::{Builtin, ByRef, Gc, Il2CppClass, Il2CppType, MethodInfo, RefType, Type};
 
 /// Trait implemented by types that can be used as C# `this` method parameters
 ///
@@ -40,6 +40,11 @@ pub unsafe trait Parameter {
     /// Checks whether the type can be used as a C# parameter with the given
     /// [`Il2CppType`]
     fn matches(ty: &Il2CppType) -> bool;
+
+    /// [`Il2CppClass`] of the parameter's static type - used to rank
+    /// candidate overloads by how close a match they are, mirroring
+    /// [`Argument::class`](crate::Argument::class)
+    fn class() -> &'static Il2CppClass;
 
     /// Converts from the actual type to the desired one
     fn from_actual(actual: Self::Actual) -> Self;
@@ -84,7 +89,29 @@ pub unsafe trait Parameters {
 
     /// Checks whether the type can be used as a C# parameter collection for the
     /// given [`MethodInfo`]
-    fn matches(method: &MethodInfo) -> bool;
+    fn matches_method(method: &MethodInfo) -> bool {
+        method.parameters().len() == Self::COUNT
+            && Self::matches(
+                &method
+                    .parameters()
+                    .iter()
+                    .map(|p| p.ty())
+                    .collect::<Vec<_>>(),
+            )
+    }
+
+    /// Checks whether the type can be used as a C# parameter collection
+    /// against an explicit list of [`Il2CppType`]s, rather than pulling them
+    /// from a [`MethodInfo`]'s declared parameters directly like
+    /// [`matches_method`](Parameters::matches_method) does - used by
+    /// [`Il2CppClass::find_method_callee`](crate::Il2CppClass::find_method_callee)
+    /// to type-check parameters after any generic-parameter substitution,
+    /// mirroring [`Arguments::matches`](crate::Arguments::matches).
+    fn matches(types: &[&Il2CppType]) -> bool;
+
+    /// [`Il2CppClass`]es of each parameter's static type, in order - see
+    /// [`Parameter::class`]
+    fn classes() -> Vec<&'static Il2CppClass>;
 }
 
 unsafe impl<T> ThisParameter for Option<&mut T>
@@ -167,6 +194,10 @@ where
         T::matches_reference_parameter(ty)
     }
 
+    fn class() -> &'static Il2CppClass {
+        T::class()
+    }
+
     fn from_actual(actual: Self::Actual) -> Self {
         actual
     }
@@ -183,6 +214,10 @@ where
 
     fn matches(ty: &Il2CppType) -> bool {
         T::matches_reference_parameter(ty)
+    }
+
+    fn class() -> &'static Il2CppClass {
+        T::class()
     }
 
     fn from_actual(actual: Self::Actual) -> Self {
@@ -203,6 +238,10 @@ where
 
     fn matches(ty: &Il2CppType) -> bool {
         T::matches_reference_parameter(ty)
+    }
+
+    fn class() -> &'static Il2CppClass {
+        T::class()
     }
 
     fn from_actual(actual: Self::Actual) -> Self {
@@ -262,6 +301,10 @@ where
         T::matches_reference_parameter(ty)
     }
 
+    fn class() -> &'static Il2CppClass {
+        T::class()
+    }
+
     fn from_actual(actual: Self::Actual) -> Self {
         actual
     }
@@ -277,6 +320,10 @@ where T: ReffableType,
 
     fn matches(ty: &Il2CppType) -> bool {
         T::matches_reference_parameter(ty)
+    }
+
+    fn class() -> &'static Il2CppClass {
+        <T as Type>::class()
     }
 
     fn from_actual(actual: Self::Actual) -> Self {
@@ -416,8 +463,12 @@ where
 unsafe impl Parameters for () {
     const COUNT: usize = 0;
 
-    fn matches(method: &MethodInfo) -> bool {
-        method.parameters().is_empty()
+    fn matches(types: &[&Il2CppType]) -> bool {
+        types.is_empty()
+    }
+
+    fn classes() -> Vec<&'static Il2CppClass> {
+        Vec::new()
     }
 }
 
@@ -427,8 +478,11 @@ where
 {
     const COUNT: usize = 1;
 
-    fn matches(method: &MethodInfo) -> bool {
-        let params = method.parameters();
-        params.len() == 1 && unsafe { P::matches(params.get_unchecked(0).ty()) }
+    fn matches(types: &[&Il2CppType]) -> bool {
+        matches!(types, [ty] if P::matches(ty))
+    }
+
+    fn classes() -> Vec<&'static Il2CppClass> {
+        vec![P::class()]
     }
 }

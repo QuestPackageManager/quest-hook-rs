@@ -15,19 +15,19 @@ pub fn expand(range: Range<usize>) -> Result<TokenStream> {
         let invokables = (0..n).map(Index::from).map(|n| quote!(self.#n.invokable()));
 
         let generic_params_parameter = (1..=n).map(|n| format_ident!("P{}", n));
-        let matches_parameter = generic_params_parameter
+        let matches_types_parameter = generic_params_parameter
             .clone()
             .enumerate()
-            .map(|(n, gp)| quote!(<#gp>::matches(params.get_unchecked(#n).ty())));
+            .map(|(n, gp)| quote!(<#gp>::matches(types[#n])));
 
         // log params
         let log_parameters = generic_params_parameter.clone().enumerate().map(|(n, gp)| {
-            quote!(unsafe {
+            quote!({
                 #[cfg(feature = "trace")]
                 crate::debug!("\tChecking parameter {} {:?} vs method param {:?}",
                     #n,
                     stringify!(#gp),
-                    params.get(#n).map(|p| (p.ty(), <#gp>::matches(p.ty())))
+                    types.get(#n).map(|&ty| (ty, <#gp>::matches(ty)))
                 );
             })
         });
@@ -39,6 +39,7 @@ pub fn expand(range: Range<usize>) -> Result<TokenStream> {
 
         let generic_params_parameter_tuple = generic_params_parameter.clone();
         let generic_params_parameter_where = generic_params_parameter.clone();
+        let generic_params_parameter_classes = generic_params_parameter.clone();
 
         let impl_ts = quote! {
             unsafe impl<#(#generic_params_argument),*> Arguments<#n> for (#(#generic_params_argument_tuple,)*)
@@ -66,10 +67,13 @@ pub fn expand(range: Range<usize>) -> Result<TokenStream> {
             {
                 const COUNT: usize = #n;
 
-                fn matches(method: &MethodInfo) -> bool {
-                    let params = method.parameters();
-                    #(#log_parameters)*;
-                    params.len() == #n && unsafe { #(#matches_parameter) && * }
+                fn matches(types: &[&Il2CppType]) -> bool {
+                    #(#log_parameters)*
+                    types.len() == #n && #(#matches_types_parameter) && *
+                }
+
+                fn classes() -> Vec<&'static Il2CppClass> {
+                    vec![#(#generic_params_parameter_classes::class()),*]
                 }
             }
         };
