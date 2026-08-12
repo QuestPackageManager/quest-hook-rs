@@ -30,6 +30,8 @@ il2cpp_functions! { pub IL2CPP_BINARY =>
     pub fn domain_get() -> &'static Il2CppDomain;
     pub fn domain_get_assemblies(domain: &Il2CppDomain, size: &mut usize) -> &'static [&'static Il2CppAssembly];
     pub fn assembly_get_image(assembly: &Il2CppAssembly) -> Option<&'static Il2CppImage>;
+    pub fn image_get_class_count(image: &Il2CppImage) -> usize;
+    pub fn image_get_class(image: &Il2CppImage, index: usize) -> Option<&'static Il2CppClass>;
     pub fn class_from_name(image: &Il2CppImage, namespace: *const c_char, name: *const c_char) -> Option<&'static Il2CppClass>;
     pub fn class_from_il2cpp_type(ty: &Il2CppType) -> &'static Il2CppClass;
     pub fn class_from_system_type(ty: &Il2CppReflectionType) -> &'static Il2CppClass;

@@ -93,7 +93,11 @@ pub use tracing::{debug, instrument};
 
 #[cfg(not(feature = "trace"))]
 macro_rules! debug {
-    ($($tt:tt)*) => {};
+    ($($tt:tt)*) => {
+        if false {
+            let _ = ::std::format_args!($($tt)*);
+        }
+    };
 }
 #[cfg(not(feature = "trace"))]
 pub use quest_hook_proc_macros::identity as instrument;
@@ -101,6 +105,7 @@ pub use quest_hook_proc_macros::identity as instrument;
 mod array;
 mod byref;
 mod class;
+pub mod debug;
 mod exception;
 mod field_info;
 mod gc;
