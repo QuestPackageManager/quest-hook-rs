@@ -50,6 +50,7 @@ il2cpp_functions! { pub IL2CPP_BINARY =>
     pub fn runtime_invoke(method: &MethodInfo, instance: *mut c_void, params: *mut *mut c_void, exception: &mut Option<&mut Il2CppException>) -> Option<&'static mut Il2CppObject>;
     pub fn string_new_len(s: *const c_char, len: u32) -> &'static mut Il2CppString;
     pub fn raise_exception(exc: &Il2CppException) -> !;
+    pub fn format_exception(exc: &Il2CppException, message: *mut c_char, message_size: i32);
     pub fn resolve_icall(name: *const c_char) -> Il2CppMethodPointer;
     pub fn object_new(class: &Il2CppClass) -> &'static mut Il2CppObject;
 

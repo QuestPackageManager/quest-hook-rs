@@ -1,3 +1,4 @@
+use std::ffi::CStr;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::ops::{Deref, DerefMut};
 
@@ -79,12 +80,17 @@ impl DerefMut for Il2CppException {
     }
 }
 
+// Uses `il2cpp_format_exception` (message + full stack trace, matching C#'s
+// own `Exception.ToString()`) rather than hand-formatting `class: message`,
+// for parity with beatsaber-hook's `exception_to_string`.
+// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/src/exceptions.cpp#L9-L13>
 impl fmt::Display for Il2CppException {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.message() {
-            Some(m) => write!(f, "{}: {}", self.class(), m),
-            None => fmt::Display::fmt(self.class(), f),
-        }
+        const BUF_SIZE: usize = 4096;
+        let mut buf = [0u8; BUF_SIZE];
+        unsafe { raw::format_exception(self.raw(), buf.as_mut_ptr().cast(), BUF_SIZE as i32) };
+        let message = unsafe { CStr::from_ptr(buf.as_ptr().cast()) };
+        f.write_str(&message.to_string_lossy())
     }
 }
 
