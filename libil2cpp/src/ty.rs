@@ -14,7 +14,7 @@ use crate::raw::{
     Il2CppTypeEnum_IL2CPP_TYPE_U1, Il2CppTypeEnum_IL2CPP_TYPE_U2, Il2CppTypeEnum_IL2CPP_TYPE_U4,
     Il2CppTypeEnum_IL2CPP_TYPE_U8, Il2CppTypeEnum_IL2CPP_TYPE_VAR, Il2CppTypeEnum_IL2CPP_TYPE_VOID,
 };
-use crate::{raw, Gc, Generics, Il2CppClass, Il2CppException, Il2CppObject, WrapRaw};
+use crate::{raw, Gc, Generics, Il2CppArray, Il2CppClass, Il2CppException, Il2CppObject, WrapRaw};
 
 /// An il2cpp type
 #[repr(transparent)]
@@ -228,17 +228,29 @@ impl Il2CppReflectionType {
     where
         G: Generics,
     {
-        let generics = G::type_array();
+        self.make_generic_with(&G::classes())
+    }
+
+    /// Instanciates a generic type template with generic arguments found at
+    /// runtime (e.g. via [`Il2CppClass::find`](crate::Il2CppClass::find))
+    /// rather than a compile-time `G: Generics`
+    pub fn make_generic_with(
+        &self,
+        classes: &[&'static Il2CppClass],
+    ) -> Result<Option<&Self>, Gc<Il2CppException>> {
         let make_generic = self
             .class()
             .find_method_unchecked("MakeGenericType", 2)
             .unwrap();
+        let mut generics = Il2CppArray::<Self>::of_refs(
+            classes.iter().map(|class| class.ty().reflection_object()),
+        );
         let ret = unsafe {
             make_generic.invoke_raw(
                 null_mut(),
                 [
                     self as *const Self as *mut c_void,
-                    (generics as *mut raw::Il2CppArray).cast(),
+                    generics.get_pointer_mut().cast(),
                 ]
                 .as_mut(),
             )

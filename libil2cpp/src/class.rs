@@ -487,7 +487,17 @@ impl Il2CppClass {
     where
         G: Generics,
     {
-        match self.ty().reflection_object().make_generic::<G>() {
+        self.make_generic_with(&G::classes())
+    }
+
+    /// Instanciates a generic class template with generic arguments found
+    /// at runtime (e.g. via [`find`](Self::find)) rather than a
+    /// compile-time `G: Generics`.
+    pub fn make_generic_with(
+        &self,
+        classes: &[&'static Self],
+    ) -> Result<Option<&'static Self>, Gc<Il2CppException>> {
+        match self.ty().reflection_object().make_generic_with(classes) {
             Ok(Some(ty)) => Ok(Some(unsafe {
                 Self::wrap(raw::class_from_system_type(ty.raw()))
             })),

@@ -30,6 +30,33 @@ impl<T: Type> Il2CppArray<T> {
         unsafe { Self::wrap_mut(arr).into() }
     }
 
+    /// Creates an array from existing, shared references - e.g. singletons
+    /// il2cpp itself owns and caches, like a `System.Type`'s reflection
+    /// object. Unlike [`new`](Self::new), which takes each element as
+    /// `T::Held` (`Option<&mut T>` for reference types, matching the
+    /// exclusive access a freshly created or claimed value would have), this
+    /// only ever copies each reference's pointer into the array, so a plain
+    /// shared `&T` is enough.
+    pub fn of_refs<'a, I>(items: I) -> Gc<Self>
+    where
+        I: IntoIterator<Item = &'a T>,
+        I::IntoIter: ExactSizeIterator<Item = &'a T>,
+        'static: 'a,
+    {
+        let items = items.into_iter();
+        let len = items.len();
+        let arr = unsafe { raw::array_new(T::class().raw(), len) }.unwrap();
+        let data_ptr =
+            ((arr as *mut _ as isize) + (raw::kIl2CppSizeOfArray as isize)) as *mut &'a T;
+        for (i, elem) in items.enumerate() {
+            unsafe {
+                let ptr = data_ptr.add(i);
+                ptr::write_unaligned(ptr, elem);
+            }
+        }
+        unsafe { Self::wrap_mut(arr).into() }
+    }
+
     /// Slice of values in the array
     pub fn as_slice(&self) -> &[T::Held<'_>] {
         let ptr = ((self as *const _ as isize) + (raw::kIl2CppSizeOfArray as isize))

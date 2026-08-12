@@ -7,8 +7,8 @@ use std::{fmt, slice};
 
 use crate::raw::{METHOD_ATTRIBUTE_ABSTRACT, METHOD_ATTRIBUTE_STATIC, METHOD_ATTRIBUTE_VIRTUAL};
 use crate::{
-    raw, Arguments, Gc, Generics, Il2CppClass, Il2CppException, Il2CppObject, Il2CppType,
-    ParameterInfo, Returned, ThisArgument, WrapRaw,
+    raw, Arguments, Gc, Generics, Il2CppArray, Il2CppClass, Il2CppException, Il2CppObject,
+    Il2CppReflectionType, Il2CppType, ParameterInfo, Returned, ThisArgument, WrapRaw,
 };
 
 #[cfg(feature = "il2cpp_v31")]
@@ -204,7 +204,19 @@ impl MethodInfo {
     where
         G: Generics,
     {
-        match self.reflection_object().make_generic::<G>() {
+        self.make_generic_with(&G::classes())
+    }
+
+    /// Instantiates a generic method template with generic arguments found
+    /// at runtime (e.g. via
+    /// [`Il2CppClass::find`](crate::Il2CppClass::find)) rather than a
+    /// compile-time `G: Generics` - see [`make_generic`](Self::make_generic)
+    /// for the rest.
+    pub fn make_generic_with(
+        &self,
+        classes: &[&'static Il2CppClass],
+    ) -> Result<Option<&'static Self>> {
+        match self.reflection_object().make_generic_with(classes) {
             Ok(Some(refl)) => Ok(Some(unsafe {
                 Self::wrap(raw::method_get_from_reflection(refl.raw()))
             })),
@@ -279,17 +291,26 @@ impl Il2CppReflectionMethod {
     where
         G: Generics,
     {
-        let generics = G::type_array();
+        self.make_generic_with(&G::classes())
+    }
+
+    /// Instantiates a generic method template with generic arguments found
+    /// at runtime (e.g. via [`Il2CppClass::find`](crate::Il2CppClass::find))
+    /// rather than a compile-time `G: Generics`.
+    pub fn make_generic_with(&self, classes: &[&'static Il2CppClass]) -> Result<Option<&Self>> {
         let make_generic = self
             .class()
             .find_method_unchecked("MakeGenericMethod", 2)
             .unwrap();
+        let mut generics = Il2CppArray::<Il2CppReflectionType>::of_refs(
+            classes.iter().map(|class| class.ty().reflection_object()),
+        );
         let ret = unsafe {
             make_generic.invoke_raw(
                 null_mut(),
                 [
                     self as *const Self as *mut c_void,
-                    (generics as *mut raw::Il2CppArray).cast(),
+                    generics.get_pointer_mut().cast(),
                 ]
                 .as_mut(),
             )
