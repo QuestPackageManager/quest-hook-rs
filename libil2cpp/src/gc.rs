@@ -86,8 +86,7 @@ where
     /// If the [`Gc<T>`] is null, this will return a null [`Gc<U>`] regardless
     /// of the type relationship.
     ///
-    /// C++ Implementation
-    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/2604126ec26dd807da0be0ad974056d1f5fe9575/shared/utils/il2cpp-utils-classes.hpp#L185-L212>
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/types.hpp#L261-L291>
     ///
     /// # Safety
     /// This function is safe to call, but the caller must ensure that the
@@ -105,7 +104,7 @@ where
 
         let value_klass = value.as_object().class();
 
-        if value_klass != U::class() && !value_klass.is_assignable_from(U::class()) {
+        if value_klass != U::class() && !U::class().is_assignable_from(value_klass) {
             return Err(format!(
                 "Downcast failed: {} is not assignable from {}",
                 U::class().name(),
