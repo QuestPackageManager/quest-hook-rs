@@ -16,6 +16,8 @@ impl Il2CppObject {
     /// Invokes the method with the given name on `self` using the given
     /// arguments, with type checking
     ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/members.hpp#L125-L130>
+    ///
     /// # Panics
     ///
     /// This method will panic if a matching method can't be found.
@@ -30,6 +32,8 @@ impl Il2CppObject {
 
     /// Invokes the `void` method with the given name on `self` using the
     /// given arguments, with type checking
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/members.hpp#L125-L130>
     ///
     /// # Panics
     ///
@@ -129,6 +133,8 @@ where
 /// Helper trait for reference types which can be dereferenced to an object
 pub trait ObjectExt: RefType + Sized {
     /// Creates a new object using the constructor taking the given arguments
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/members.hpp#L238-L256>
     fn new<A, const N: usize>(args: A) -> Gc<Self>
     where
         A: Arguments<N>,

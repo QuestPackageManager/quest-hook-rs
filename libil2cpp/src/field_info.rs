@@ -14,6 +14,8 @@ unsafe impl Sync for FieldInfo {}
 
 impl FieldInfo {
     /// Store a typechecked value into a field
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/members.hpp#L152-L157>
     pub fn store<A>(&self, instance: &mut Il2CppObject, val: A)
     where
         A: Argument,
@@ -34,6 +36,8 @@ impl FieldInfo {
     }
 
     /// Load a typechecked value from a field
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/members.hpp#L146-L150>
     pub fn load<'a, T>(&self, instance: &'a mut Il2CppObject) -> T::Held<'a>
     where
         T: Type,

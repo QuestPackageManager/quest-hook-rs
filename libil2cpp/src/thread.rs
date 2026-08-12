@@ -40,6 +40,8 @@ impl Drop for AttachedThread {
 /// Attaches the current thread to the il2cpp runtime, returning a guard
 /// that detaches it again on drop.
 ///
+/// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/threading.hpp#L36-L45>
+///
 /// # Safety
 /// The calling thread must not already be attached - attaching an
 /// already-attached thread, or detaching one still in use elsewhere (by
@@ -53,6 +55,8 @@ pub unsafe fn attach() -> AttachedThread {
 
 /// Runs `f` with the current thread attached to il2cpp for the duration,
 /// detaching again once `f` returns (or panics) - see [`attach`].
+///
+/// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/threading.hpp#L57-L65>
 ///
 /// # Safety
 /// Same as [`attach`]: the calling thread must not already be attached.
@@ -73,6 +77,8 @@ where
 /// See [`crate::r#async::il2cpp_async`] for a version that returns an
 /// `.await`-able [`Future`](std::future::Future) instead of a
 /// [`JoinHandle`].
+///
+/// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/threading.hpp#L81-L101>
 pub fn spawn_attached<F, T>(f: F) -> JoinHandle<T>
 where
     F: FnOnce() -> T + Send + 'static,

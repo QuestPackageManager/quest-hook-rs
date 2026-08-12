@@ -97,9 +97,9 @@ Most APIs in this crate hand back a `Gc<T>` — a thin, `Copy`, nullable pointer
 
 `Gc<T>` is intentionally a **weak** reference. IL2CPP uses the Boehm Garbage Collector, the same one as Mono. The garbage collector only scans memory it knows to be a root (the stack, static fields, a handful of explicitly-registered allocations etc.). This implies that memory outside of the stack, e.g the heap, does not get scanned by the GC and will consequently be cleaned up. Additionally, the GC is not aware of newly created threads (unless we tell it), so a `Gc<T>` sitting in an ordinary Rust variable or struct field is invisible to it. This also means that variables in Rust async are not noticed by the GC.
 
-The GC will periodically scan and destroy objects if nothing else keeps it alive. `Gc<T>` is safe to receive, null-check, and use immediately, but not safe to hold onto. Destroyed objects have no indicators that they've been destroyed, and you will reach a SEGFAULT (usually SEGV_MAPERR).
+The GC will periodically scan and destroy objects if nothing else keeps it alive. `Gc<T>` is safe to receive, null-check, and use immediately, but not safe to hold onto. Destroyed objects have no indicators that they've been destroyed, and you will reach a SEGFAULT (usually `SEGV_MAPERR`).
 
-See more info here [https://www.hboehm.info/ismm/04tutorial.pdf]. 
+See more info here [<https://www.hboehm.info/ismm/04tutorial.pdf>]. 
 
 `NonNullGc<T>` is the same weak pointer with nullability checked out of the type, for when you've already confirmed a `Gc<T>` isn't null and want the compiler to remember that.
 

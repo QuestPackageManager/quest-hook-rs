@@ -11,6 +11,8 @@ pub struct Il2CppArray<T: Type>(raw::Il2CppArray, PhantomData<[T]>);
 
 impl<T: Type> Il2CppArray<T> {
     /// Creates an array from an iterator
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/arrayw.hpp#L38-L57>
     pub fn new<'a, I>(items: I) -> Gc<Self>
     where
         I: IntoIterator<Item = T::Held<'a>>,
@@ -58,6 +60,8 @@ impl<T: Type> Il2CppArray<T> {
     }
 
     /// Slice of values in the array
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/arrayw.hpp#L217-L219>
     pub fn as_slice(&self) -> &[T::Held<'_>] {
         let ptr = ((self as *const _ as isize) + (raw::kIl2CppSizeOfArray as isize))
             as *const T::Held<'_>;
@@ -66,6 +70,8 @@ impl<T: Type> Il2CppArray<T> {
     }
 
     /// Mutable slice of values in the array
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/arrayw.hpp#L220-L222>
     pub fn as_mut_slice(&mut self) -> &mut [T::Held<'_>] {
         let ptr =
             ((self as *mut _ as isize) + (raw::kIl2CppSizeOfArray as isize)) as *mut T::Held<'_>;
@@ -74,6 +80,8 @@ impl<T: Type> Il2CppArray<T> {
     }
 
     /// Length of the array
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/arrayw.hpp#L96>
     pub fn len(&self) -> usize {
         let raw = self.raw();
         let bounds: Option<&raw::Il2CppArrayBounds> = unsafe { transmute(raw.bounds) };

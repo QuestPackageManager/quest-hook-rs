@@ -147,7 +147,8 @@ impl MethodInfo {
 
     /// Number of the method's own generic type parameters (`0` for a
     /// non-generic method) - e.g. `2` for `Foo<T, U>()`. Mirrors
-    /// beatsaber-hook's `GetGenericContainer` (`il2cpp-utils-methods.hpp`),
+    /// beatsaber-hook's
+    /// [`get_generic_container`](https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/src/types.cpp#L243-L260),
     /// but only its non-inflated branch: methods reached by walking
     /// [`Il2CppClass::methods`](crate::Il2CppClass::methods) during
     /// [`Il2CppClass::find_method`](crate::Il2CppClass::find_method)'s

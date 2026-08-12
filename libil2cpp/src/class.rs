@@ -36,6 +36,8 @@ unsafe impl Sync for Il2CppClass {}
 
 impl Il2CppClass {
     /// Find a class by namespace and name
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/src/types.cpp#L51-L102>
     #[crate::instrument(level = "debug")]
     pub fn find(namespace: &str, name: &str) -> Option<&'static Self> {
         #[cfg(feature = "cache")]
@@ -339,6 +341,8 @@ impl Il2CppClass {
     /// arguments (only some of their types do), so it can be found this way
     /// even before it's instantiated, unlike [`find_method`](Self::find_method)
     /// which type-checks parameters and so needs them to already be concrete.
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/src/find.cpp#L266-L278>
     pub fn find_method_unchecked(
         &self,
         name: &str,
@@ -391,6 +395,8 @@ impl Il2CppClass {
     /// Unlike [`find_method`](Self::find_method) and friends, this does not
     /// walk the class hierarchy - a vtable slot only makes sense relative to
     /// the exact class that declares the method at that slot.
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/src/find.cpp#L309-L323>
     pub fn find_method_by_slot(&self, slot: u16) -> Option<&'static MethodInfo> {
         self.methods().iter().find(|mi| mi.slot() == slot).copied()
     }
@@ -404,6 +410,8 @@ impl Il2CppClass {
     /// `self`'s hierarchy - this is the mechanism generated hooks use to
     /// hook a specific override without knowing its (possibly obfuscated)
     /// name.
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/src/find.cpp#L325-L373>
     pub fn find_method_by_vtable(
         &self,
         declaring_class: &Self,
@@ -450,6 +458,8 @@ impl Il2CppClass {
     }
 
     /// Find a field belonging to the class or its parents by name
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/src/find.cpp#L426-L457>
     #[crate::instrument(level = "debug")]
     pub fn find_field(&self, name: &str) -> Option<&FieldInfo> {
         for c in self.hierarchy() {
@@ -466,6 +476,8 @@ impl Il2CppClass {
     }
 
     /// Find a property belonging to the class or its parents by name
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/src/find.cpp#L390-L419>
     #[crate::instrument(level = "debug")]
     pub fn find_property(&self, name: &str) -> Option<&PropertyInfo> {
         for c in self.hierarchy() {
@@ -483,6 +495,8 @@ impl Il2CppClass {
 
     /// Instanciates a generic class template with the provided generic
     /// arguments
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/src/types.cpp#L113-L133>
     pub fn make_generic<G>(&self) -> Result<Option<&'static Self>, Gc<Il2CppException>>
     where
         G: Generics,
@@ -521,6 +535,8 @@ impl Il2CppClass {
 
     /// Invokes the `static` method with the given name using the given
     /// arguments, with type checking
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/members.hpp#L125-L130>
     pub fn invoke<A, R, const N: usize>(&self, name: &str, args: A) -> crate::Result<R>
     where
         A: Arguments<N>,
@@ -539,6 +555,8 @@ impl Il2CppClass {
 
     /// Invokes the `static void` method with the given name using the given
     /// arguments, with type checking
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/members.hpp#L125-L130>
     pub fn invoke_void<A, const N: usize>(&self, name: &str, args: A) -> crate::Result<()>
     where
         A: Arguments<N>,
@@ -653,9 +671,19 @@ impl Il2CppClass {
     }
 
     /// Nested types of the class
-    pub fn nested_types(&self) -> &[&Self] {
+    pub fn nested_types(&self) -> &[&'static Self] {
         let raw = self.raw();
         unsafe { slice::from_raw_parts(raw.nestedTypes as _, raw.nested_type_count as _) }
+    }
+
+    /// Find a class nested directly inside this one by name
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/src/types.cpp#L27-L46>
+    pub fn find_nested(&self, name: &str) -> Option<&'static Self> {
+        self.nested_types()
+            .iter()
+            .find(|c| c.name() == name)
+            .copied()
     }
 
     /// Whether the class is assignable from `other`

@@ -12,6 +12,8 @@ pub struct Il2CppString(raw::Il2CppString);
 
 impl Il2CppString {
     /// Creates a new string from a Rust string
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/src/stringw.cpp#L36-L42>
     pub fn new(s: impl AsRef<str>) -> Gc<Self> {
         let b = s.as_ref().as_bytes();
         let s = unsafe { raw::string_new_len(b.as_ptr().cast(), b.len() as _) };
@@ -20,6 +22,8 @@ impl Il2CppString {
 
     /// Converts the string to a Rust string, returning an error if its utf-16
     /// data is invalid
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/stringw.hpp#L28-L31>
     pub fn to_string(&self) -> Result<String, FromUtf16Error> {
         String::from_utf16(self.as_utf16())
     }

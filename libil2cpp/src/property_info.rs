@@ -14,6 +14,8 @@ unsafe impl Sync for PropertyInfo {}
 impl PropertyInfo {
     /// Gets a typechecked value from the property on `instance`
     ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/members.hpp#L133-L137>
+    ///
     /// # Panics
     ///
     /// This method will panic if the property has no getter
@@ -49,6 +51,8 @@ impl PropertyInfo {
     }
 
     /// Sets a typechecked value on the property on `instance`
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/shared/members.hpp#L139-L144>
     ///
     /// # Panics
     ///
