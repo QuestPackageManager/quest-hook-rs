@@ -16,7 +16,7 @@ pub trait ValueType: for<'a> Type<Held<'a> = Self> + Sized {
         A: Arguments<N>,
         R: Returned,
     {
-        let method = Self::class().find_method::<A, R, N>(name).unwrap();
+        let method = Self::class().find_method::<A, (), R, N>(name).unwrap();
         unsafe { method.invoke_unchecked(self, args) }
     }
 
@@ -30,7 +30,7 @@ pub trait ValueType: for<'a> Type<Held<'a> = Self> + Sized {
     where
         A: Arguments<N>,
     {
-        let method = Self::class().find_method::<A, (), N>(name).unwrap();
+        let method = Self::class().find_method::<A, (), (), N>(name).unwrap();
         unsafe { method.invoke_unchecked(self, args) }
     }
 

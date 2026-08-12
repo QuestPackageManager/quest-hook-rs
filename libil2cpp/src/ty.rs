@@ -8,13 +8,13 @@ use std::ptr::null_mut;
 use crate::raw::{
     Il2CppTypeEnum_IL2CPP_TYPE_BOOLEAN, Il2CppTypeEnum_IL2CPP_TYPE_CHAR,
     Il2CppTypeEnum_IL2CPP_TYPE_I1, Il2CppTypeEnum_IL2CPP_TYPE_I2, Il2CppTypeEnum_IL2CPP_TYPE_I4,
-    Il2CppTypeEnum_IL2CPP_TYPE_I8, Il2CppTypeEnum_IL2CPP_TYPE_OBJECT,
-    Il2CppTypeEnum_IL2CPP_TYPE_R4, Il2CppTypeEnum_IL2CPP_TYPE_R8,
-    Il2CppTypeEnum_IL2CPP_TYPE_STRING, Il2CppTypeEnum_IL2CPP_TYPE_U1,
-    Il2CppTypeEnum_IL2CPP_TYPE_U2, Il2CppTypeEnum_IL2CPP_TYPE_U4, Il2CppTypeEnum_IL2CPP_TYPE_U8,
-    Il2CppTypeEnum_IL2CPP_TYPE_VOID,
+    Il2CppTypeEnum_IL2CPP_TYPE_I8, Il2CppTypeEnum_IL2CPP_TYPE_MVAR,
+    Il2CppTypeEnum_IL2CPP_TYPE_OBJECT, Il2CppTypeEnum_IL2CPP_TYPE_R4,
+    Il2CppTypeEnum_IL2CPP_TYPE_R8, Il2CppTypeEnum_IL2CPP_TYPE_STRING,
+    Il2CppTypeEnum_IL2CPP_TYPE_U1, Il2CppTypeEnum_IL2CPP_TYPE_U2, Il2CppTypeEnum_IL2CPP_TYPE_U4,
+    Il2CppTypeEnum_IL2CPP_TYPE_U8, Il2CppTypeEnum_IL2CPP_TYPE_VAR, Il2CppTypeEnum_IL2CPP_TYPE_VOID,
 };
-use crate::{raw, Gc, Generics, Il2CppClass, Il2CppException, Il2CppObject, WrapRaw};
+use crate::{raw, Gc, Generics, Il2CppArray, Il2CppClass, Il2CppException, Il2CppObject, WrapRaw};
 
 /// An il2cpp type
 #[repr(transparent)]
@@ -48,6 +48,41 @@ impl Il2CppType {
     /// [`Il2CppReflectionType`] which represents the type
     pub fn reflection_object(&self) -> &Il2CppReflectionType {
         unsafe { Il2CppReflectionType::wrap_mut(raw::type_get_object(self.raw())) }
+    }
+
+    /// The 0-based position of this type's generic parameter in its owning
+    /// generic class/method's parameter list, if this type actually
+    /// represents an unresolved generic parameter placeholder - a class's
+    /// own `T` in `Foo<T>` (`IL2CPP_TYPE_VAR`), or a method's own `T` in
+    /// `Bar<T>()` (`IL2CPP_TYPE_MVAR`) - rather than a concrete type.
+    /// `None` for any concrete type.
+    ///
+    /// This is what makes matching a generic method's *un-instantiated*
+    /// parameters against caller-supplied types possible at all - see
+    /// [`Il2CppClass::find_method`](crate::Il2CppClass::find_method)'s
+    /// generic-method substitution.
+    pub fn generic_parameter_index(&self) -> Option<u16> {
+        let ty = self.raw().type_();
+        if ty != Il2CppTypeEnum_IL2CPP_TYPE_VAR && ty != Il2CppTypeEnum_IL2CPP_TYPE_MVAR {
+            return None;
+        }
+
+        #[cfg(any(feature = "il2cpp_v31", feature = "il2cpp_v29"))]
+        {
+            // The union holds a handle - a pointer straight into il2cpp's
+            // mmap'd global metadata file, at this parameter's own metadata
+            // entry, whose `num` field already gives the 0-based position
+            // directly (see `raw::Il2CppGenericParameter`).
+            let handle = unsafe { self.raw().data.genericParameterHandle };
+            Some(unsafe { (*handle.cast::<raw::Il2CppGenericParameter>()).num })
+        }
+
+        #[cfg(any(feature = "il2cpp_v24", feature = "unity2018"))]
+        {
+            // No handle indirection on these versions - the union holds the
+            // index directly.
+            Some(unsafe { self.raw().data.genericParameterIndex } as u16)
+        }
     }
 }
 
@@ -193,17 +228,29 @@ impl Il2CppReflectionType {
     where
         G: Generics,
     {
-        let generics = G::type_array();
+        self.make_generic_with(&G::classes())
+    }
+
+    /// Instanciates a generic type template with generic arguments found at
+    /// runtime (e.g. via [`Il2CppClass::find`](crate::Il2CppClass::find))
+    /// rather than a compile-time `G: Generics`
+    pub fn make_generic_with(
+        &self,
+        classes: &[&'static Il2CppClass],
+    ) -> Result<Option<&Self>, Gc<Il2CppException>> {
         let make_generic = self
             .class()
             .find_method_unchecked("MakeGenericType", 2)
             .unwrap();
+        let mut generics = Il2CppArray::<Self>::of_refs(
+            classes.iter().map(|class| class.ty().reflection_object()),
+        );
         let ret = unsafe {
             make_generic.invoke_raw(
                 null_mut(),
                 [
                     self as *const Self as *mut c_void,
-                    (generics as *mut raw::Il2CppArray).cast(),
+                    generics.get_pointer_mut().cast(),
                 ]
                 .as_mut(),
             )
@@ -237,5 +284,49 @@ impl fmt::Debug for Il2CppReflectionType {
         f.debug_struct("Il2CppReflectionType")
             .field("ty", self.ty())
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::mem;
+
+    use super::*;
+
+    fn leak<T>(value: T) -> &'static T {
+        Box::leak(Box::new(value))
+    }
+
+    fn fake_generic_param_type(kind: raw::Il2CppTypeEnum, num: u16) -> raw::Il2CppType {
+        let mut param: raw::Il2CppGenericParameter = unsafe { mem::zeroed() };
+        param.num = num;
+        let handle = (leak(param) as *const raw::Il2CppGenericParameter).cast();
+
+        let mut ty: raw::Il2CppType = unsafe { mem::zeroed() };
+        ty.set_type(kind);
+        ty.data.genericParameterHandle = handle;
+        ty
+    }
+
+    #[test]
+    fn generic_parameter_index_reads_an_mvar_placeholders_position() {
+        let raw = fake_generic_param_type(Il2CppTypeEnum_IL2CPP_TYPE_MVAR, 2);
+        let ty = unsafe { Il2CppType::wrap(&raw) };
+        assert_eq!(ty.generic_parameter_index(), Some(2));
+    }
+
+    #[test]
+    fn generic_parameter_index_reads_a_var_placeholders_position() {
+        let raw = fake_generic_param_type(Il2CppTypeEnum_IL2CPP_TYPE_VAR, 0);
+        let ty = unsafe { Il2CppType::wrap(&raw) };
+        assert_eq!(ty.generic_parameter_index(), Some(0));
+    }
+
+    #[test]
+    fn generic_parameter_index_is_none_for_a_concrete_type() {
+        let mut raw: raw::Il2CppType = unsafe { mem::zeroed() };
+        raw.set_type(raw::Il2CppTypeEnum_IL2CPP_TYPE_I4);
+        let ty = unsafe { Il2CppType::wrap(&raw) };
+        assert_eq!(ty.generic_parameter_index(), None);
     }
 }

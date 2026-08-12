@@ -5,3 +5,4 @@
 #include "extern/includes/libil2cpp/il2cpp/libil2cpp/il2cpp-metadata.h"
 #include "extern/includes/libil2cpp/il2cpp/libil2cpp/il2cpp-object-internals.h"
 #include "extern/includes/libil2cpp/il2cpp/libil2cpp/il2cpp-tabledefs.h"
+#include "extern/includes/libil2cpp/il2cpp/libil2cpp/vm/GlobalMetadataFileInternals.h"

@@ -73,3 +73,7 @@ required-features = ["util"]
 name = "generics"
 crate-type = ["cdylib"]
 required-features = ["util"]
+[[example]]
+name = "runtime_types"
+crate-type = ["cdylib"]
+required-features = ["util"]

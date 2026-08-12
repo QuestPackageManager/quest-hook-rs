@@ -105,22 +105,26 @@ impl Il2CppClass {
             .unwrap()
     }
 
-    /// Find a method belonging to the class or its parents by name with type
-    /// checking
+    /// Find a method belonging to the class or its parents by name, with
+    /// type checking
     ///
-    /// If more than one method type-checks (an overload), the best match is
-    /// picked the same way beatsaber-hook's `find_method` does: a candidate
-    /// whose parameters are an exact class-for-class match wins immediately,
-    /// otherwise every candidate is scored by [`param_distance`] and the
-    /// lowest-scoring one is used - this never fails merely because more
-    /// than one overload type-checks (see [`Self::resolve_method`]).
+    /// `G` is the method's own generic type arguments, `()` if it isn't
+    /// generic - pass a real `G` to find a method like `Foo<T>()`, which
+    /// comes back as the un-instantiated definition; call
+    /// [`MethodInfo::make_generic`](crate::MethodInfo::make_generic) on it
+    /// to get a concrete, invocable method. `R` is only checked when `G ==
+    /// ()`, since a generic method's return type can itself be `T`.
+    ///
+    /// If more than one method type-checks, the closest match by parameter
+    /// types wins - see [`Self::resolve_method`].
     #[crate::instrument(level = "debug")]
-    pub fn find_method<A, R, const N: usize>(
+    pub fn find_method<A, G, R, const N: usize>(
         &self,
         name: &str,
     ) -> Result<&'static MethodInfo, FindMethodError>
     where
         A: Arguments<N>,
+        G: Generics + 'static,
         R: Returned,
     {
         #[cfg(feature = "cache")]
@@ -132,7 +136,7 @@ impl Il2CppClass {
             let key = cache::MethodCacheKey {
                 class: class_key,
                 name: name.into(),
-                ty: std::any::TypeId::of::<fn(Self, A::Type) -> R::Type>(),
+                ty: std::any::TypeId::of::<fn(Self, A::Type, G) -> R::Type>(),
             };
             if let Some(method) = cache::METHOD_CACHE.with(|c| c.borrow().get(&key).copied()) {
                 debug!("cache hit");
@@ -142,7 +146,7 @@ impl Il2CppClass {
             key
         };
 
-        let method = self.resolve_method::<A, R, N>(name, false)?;
+        let method = self.resolve_method::<A, G, R, N>(name, false)?;
 
         #[cfg(feature = "cache")]
         cache::METHOD_CACHE.with(move |c| c.borrow_mut().insert(key.into(), method));
@@ -150,18 +154,16 @@ impl Il2CppClass {
         Ok(method)
     }
 
-    /// Find a `static` method belonging to the class by name with type
-    /// checking
-    ///
-    /// See [`find_method`](Self::find_method) for how overloads are
-    /// resolved when more than one candidate type-checks.
+    /// Find a `static` method belonging to the class by name, with type
+    /// checking - see [`find_method`](Self::find_method) for `G`/`R`.
     #[crate::instrument(level = "debug")]
-    pub fn find_static_method<A, R, const N: usize>(
+    pub fn find_static_method<A, G, R, const N: usize>(
         &self,
         name: &str,
     ) -> Result<&'static MethodInfo, FindMethodError>
     where
         A: Arguments<N>,
+        G: Generics + 'static,
         R: Returned,
     {
         #[cfg(feature = "cache")]
@@ -173,7 +175,7 @@ impl Il2CppClass {
             let key = cache::MethodCacheKey {
                 class: class_key,
                 name: name.into(),
-                ty: std::any::TypeId::of::<fn((), A::Type) -> R::Type>(),
+                ty: std::any::TypeId::of::<fn((), A::Type, G) -> R::Type>(),
             };
             if let Some(method) = cache::METHOD_CACHE.with(|c| c.borrow().get(&key).copied()) {
                 debug!("cache hit");
@@ -183,7 +185,7 @@ impl Il2CppClass {
             key
         };
 
-        let method = self.resolve_method::<A, R, N>(name, true)?;
+        let method = self.resolve_method::<A, G, R, N>(name, true)?;
         debug!("Found method: {}.{}", self, name);
 
         #[cfg(feature = "cache")]
@@ -193,28 +195,25 @@ impl Il2CppClass {
     }
 
     /// Shared implementation of [`find_method`](Self::find_method) and
-    /// [`find_static_method`](Self::find_static_method) - walks the class
-    /// hierarchy collecting every method named `name` (optionally requiring
-    /// it be `static`) that [`A::matches`](Arguments::matches)/
-    /// [`R::matches`](Returned::matches) already approve as callable, then
-    /// ranks the candidates the way beatsaber-hook's `find_method` +
-    /// `param_distance` do (`find.cpp`): the first candidate whose
-    /// parameters are all an exact class match wins immediately; otherwise
-    /// every convertible candidate is scored (lower is closer, see
-    /// [`method_weight`]) and the lowest-scoring one wins. Multiple
-    /// convertible candidates only ever produce a `debug!` note, mirroring
-    /// upstream, which never fails merely because more than one overload
-    /// type-checks.
-    fn resolve_method<A, R, const N: usize>(
+    /// [`find_static_method`](Self::find_static_method)
+    ///
+    /// Walks the class hierarchy for methods named `name` with the right
+    /// arity, genericity and (for a non-generic `G`) return type, then picks
+    /// the closest-matching one by [`method_weight`]: an exact match wins
+    /// immediately, otherwise the lowest-scoring candidate does. Never fails
+    /// just because more than one candidate type-checks.
+    fn resolve_method<A, G, R, const N: usize>(
         &self,
         name: &str,
         static_only: bool,
     ) -> Result<&'static MethodInfo, FindMethodError>
     where
         A: Arguments<N>,
+        G: Generics,
         R: Returned,
     {
         let arg_classes = A::classes();
+        let generics = G::classes();
 
         let mut best: Option<&'static MethodInfo> = None;
         let mut best_weight = i32::MAX;
@@ -224,34 +223,34 @@ impl Il2CppClass {
             for mi in c.methods().iter().copied() {
                 if mi.name() != name
                     || (static_only && !mi.is_static())
-                    || !A::matches(mi)
-                    || !R::matches(mi.return_ty())
+                    || mi.parameters().len() != N
+                    || mi.generic_parameter_count() as usize != G::COUNT
+                    || (G::COUNT == 0 && !R::matches(mi.return_ty()))
                 {
                     continue;
                 }
 
-                match method_weight(mi, &arg_classes) {
-                    Closeness::Exact => {
+                match method_weight::<A, N>(mi, &arg_classes, &generics) {
+                    Some(Closeness::Exact) => {
                         best = Some(mi);
                         break 'hierarchy;
                     }
-                    Closeness::Convertible(weight) if weight < best_weight => {
+                    Some(Closeness::Convertible(w)) if w < best_weight => {
                         multiple = best.is_some();
-                        best_weight = weight;
+                        best_weight = w;
                         best = Some(mi);
                     }
-                    Closeness::Convertible(_) => {}
+                    Some(Closeness::Convertible(_)) | None => {}
                 }
             }
         }
 
         let Some(best) = best else {
-            let info = FindMethodParameters {
+            return Err(FindMethodError::None(FindMethodParameters {
                 ty_name: self.to_string(),
                 method_name: name.to_string(),
                 parameters: arg_classes.iter().map(|c| c.to_string()).collect(),
-            };
-            return Err(FindMethodError::None(info));
+            }));
         };
 
         if multiple {
@@ -331,7 +330,15 @@ impl Il2CppClass {
     }
 
     /// Find a method belonging to the class or its parents by name and
-    /// parameter count, without type checking
+    /// parameter count, without type checking.
+    ///
+    /// This is also the way to look up a *generic* method's definition
+    /// before instantiating it with
+    /// [`MethodInfo::make_generic`](crate::MethodInfo::make_generic): a
+    /// generic method's parameter *count* doesn't depend on its type
+    /// arguments (only some of their types do), so it can be found this way
+    /// even before it's instantiated, unlike [`find_method`](Self::find_method)
+    /// which type-checks parameters and so needs them to already be concrete.
     pub fn find_method_unchecked(
         &self,
         name: &str,
@@ -480,7 +487,17 @@ impl Il2CppClass {
     where
         G: Generics,
     {
-        match self.ty().reflection_object().make_generic::<G>() {
+        self.make_generic_with(&G::classes())
+    }
+
+    /// Instanciates a generic class template with generic arguments found
+    /// at runtime (e.g. via [`find`](Self::find)) rather than a
+    /// compile-time `G: Generics`.
+    pub fn make_generic_with(
+        &self,
+        classes: &[&'static Self],
+    ) -> Result<Option<&'static Self>, Gc<Il2CppException>> {
+        match self.ty().reflection_object().make_generic_with(classes) {
             Ok(Some(ty)) => Ok(Some(unsafe {
                 Self::wrap(raw::class_from_system_type(ty.raw()))
             })),
@@ -510,7 +527,7 @@ impl Il2CppClass {
         R: Returned,
     {
         let method = self
-            .find_static_method::<A, R, N>(name)
+            .find_static_method::<A, (), R, N>(name)
             .unwrap_or_else(|e| {
                 panic!(
                     "no matching methods found for non-void {}.{}({}) Cause: {e:?}",
@@ -527,7 +544,7 @@ impl Il2CppClass {
         A: Arguments<N>,
     {
         let method = self
-            .find_static_method::<A, (), N>(name)
+            .find_static_method::<A, (), (), N>(name)
             .unwrap_or_else(|e| {
                 panic!(
                     "no matching methods found for void {}.{}({}) Cause: {e:?}",
@@ -780,18 +797,13 @@ enum Closeness {
 
 /// Distance between a method parameter's declared class and the class of
 /// the argument being passed for it - ports beatsaber-hook's
-/// `param_distance` (`find.cpp`) verbatim, quirks included, since
-/// [`Self::resolve_method`] uses it to rank overloads exactly the way
-/// upstream does.
+/// `param_distance` (`find.cpp`) verbatim, quirks included.
 ///
-/// Lower is closer. `0` (well, [`Closeness::Exact`]) means the classes are
-/// identical. Otherwise this walks `passed_class`'s assignability chain up
-/// to `method_class` (one point of distance per step, breaking early if it
-/// stops being assignable), then adjusts for shared implemented interfaces.
-/// Interfaces are strongly preferred against other interfaces and strongly
-/// avoided when a concrete `method_class` was expected but an interface was
-/// passed (`1000` - `find.cpp` calls this out as "avoid" via a large
-/// constant, not a hard rejection).
+/// Lower is closer; `0`/[`Closeness::Exact`] means identical classes.
+/// Otherwise this counts steps up `passed_class`'s parent chain towards
+/// `method_class`, then adjusts for shared implemented interfaces.
+/// Interfaces are preferred against other interfaces and heavily penalized
+/// when a concrete class was expected but an interface was passed.
 fn param_distance(method_class: &Il2CppClass, passed_class: &Il2CppClass) -> Closeness {
     if method_class == passed_class {
         return Closeness::Exact;
@@ -849,26 +861,49 @@ fn param_distance(method_class: &Il2CppClass, passed_class: &Il2CppClass) -> Clo
     Closeness::Convertible(distance)
 }
 
-/// Aggregate [`Closeness`] of a candidate method against a full argument
-/// list - [`Closeness::Exact`] only if every parameter is
-/// [`Closeness::Exact`], otherwise the sum of every parameter's distance
-/// (treating an exact parameter as contributing `0`). Mirrors the
-/// `by_types` branch of beatsaber-hook's `find_method` switching on
-/// `param_match`'s result.
+/// Ranks a candidate method against `arg_classes`, substituting `generics`
+/// in for any parameter typed as one of the method's own generic parameters
+/// first (a no-op when `generics` is empty).
 ///
-/// Only meaningful for a candidate that's already passed the crate's own
-/// (assignability-based) [`Arguments::matches`] check - this doesn't
-/// independently re-verify convertibility, only ranks already-approved
-/// candidates.
-fn method_weight<const N: usize>(
-    mi: &MethodInfo,
+/// `None` rules the candidate out: a parameter's generic index doesn't fit
+/// `generics`, or the (possibly-substituted) parameter types don't
+/// type-check against `A` at all. Otherwise, [`Closeness::Exact`] if every
+/// parameter is an exact match, else [`Closeness::Convertible`] with the
+/// summed [`param_distance`] of every parameter.
+fn method_weight<A, const N: usize>(
+    mi: &'static MethodInfo,
     arg_classes: &[&'static Il2CppClass; N],
-) -> Closeness {
+    generics: &[&'static Il2CppClass],
+) -> Option<Closeness>
+where
+    A: Arguments<N>,
+{
+    let mut param_tys = Vec::with_capacity(N);
+    for param in mi.parameters() {
+        let ty = param.ty();
+        let substituted = match ty.generic_parameter_index() {
+            Some(index) => {
+                let klass = *generics.get(index as usize)?;
+                if ty.is_ref() {
+                    klass.this_arg_ty()
+                } else {
+                    klass.byval_arg_ty()
+                }
+            }
+            None => ty,
+        };
+        param_tys.push(substituted);
+    }
+
+    if !A::matches(&param_tys) {
+        return None;
+    }
+
     let mut weight = 0;
     let mut exact = true;
 
-    for (param, &arg_class) in mi.parameters().iter().zip(arg_classes) {
-        match param_distance(param.ty().class(), arg_class) {
+    for (ty, &arg_class) in param_tys.iter().zip(arg_classes) {
+        match param_distance(ty.class(), arg_class) {
             Closeness::Exact => {}
             Closeness::Convertible(d) => {
                 exact = false;
@@ -877,11 +912,11 @@ fn method_weight<const N: usize>(
         }
     }
 
-    if exact {
+    Some(if exact {
         Closeness::Exact
     } else {
         Closeness::Convertible(weight)
-    }
+    })
 }
 
 /// No matching method were found
@@ -1302,6 +1337,63 @@ mod tests {
         assert_eq!(
             param_distance(method_param, passed),
             Closeness::Convertible(1000)
+        );
+    }
+
+    fn fake_mvar_type(num: u16) -> &'static raw::Il2CppType {
+        let mut param: raw::Il2CppGenericParameter = unsafe { mem::zeroed() };
+        param.num = num;
+        let handle = (leak(param) as *const raw::Il2CppGenericParameter).cast();
+
+        let mut ty: raw::Il2CppType = unsafe { mem::zeroed() };
+        ty.set_type(raw::Il2CppTypeEnum_IL2CPP_TYPE_MVAR);
+        ty.data.genericParameterHandle = handle;
+        leak(ty)
+    }
+
+    fn fake_generic_method_with_params(
+        name: &'static CStr,
+        params: &'static [*const raw::Il2CppType],
+    ) -> &'static MethodInfo {
+        let mut raw: raw::MethodInfo = unsafe { mem::zeroed() };
+        raw.name = name.as_ptr();
+        raw.parameters = params.as_ptr().cast_mut();
+        raw.parameters_count = params.len() as u8;
+        unsafe { MethodInfo::wrap_ptr(leak(raw)) }.unwrap()
+    }
+
+    // Unlike the old class-only substitution this replaced,
+    // `method_weight`'s `A::matches_types` gate (needed for the by-ref check
+    // - see its doc comment) calls into a real `Argument::matches` impl for
+    // every parameter that passed substitution, which - like
+    // `Il2CppClass::is_assignable_from` for any non-identical pair -
+    // ultimately calls `Il2CppType::class()`'s `class_from_il2cpp_type` FFI
+    // function even where the two classes involved are actually identical
+    // (there's no pointer-identity fast path before that call the way
+    // `Il2CppClass::is_assignable_from`/`param_distance` have). So only the
+    // out-of-bounds generic-index rejection - which returns before
+    // `matches_types` is ever called - is reachable without a live il2cpp
+    // runtime; everything else needs one, the same boundary the
+    // `param_distance` tests above document hitting.
+
+    #[test]
+    fn method_weight_none_when_generic_index_out_of_bounds() {
+        let concrete = fake_class(0);
+        // References generic slot 1, but only slot 0 is supplied below.
+        let mvar = fake_mvar_type(1);
+        let params = leak_slice(vec![mvar as *const raw::Il2CppType]);
+        let method = fake_generic_method_with_params(c"Foo", params);
+
+        let arg_classes = [concrete];
+        let generics = [concrete];
+
+        // `crate::ValueTypePadding<0>` is only used here as a placeholder
+        // `Arguments<1>` - the out-of-bounds index rejects the candidate
+        // before `A::matches_types` (or anything else about `A`) is ever
+        // consulted.
+        assert_eq!(
+            method_weight::<crate::ValueTypePadding<0>, 1>(method, &arg_classes, &generics),
+            None
         );
     }
 }

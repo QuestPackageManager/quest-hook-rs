@@ -147,6 +147,59 @@ pub unsafe fn fake_value_box<T: ValueType>(this: &T) -> *mut Il2CppObject {
     (address - size_of::<Il2CppObject>()) as *mut Il2CppObject
 }
 
+/// A generic parameter's own metadata entry - matches
+/// `vm/GlobalMetadataFileInternals.h`'s `Il2CppGenericParameter` exactly
+/// (`ownerIndex: GenericContainerIndex`, `nameIndex: StringIndex`,
+/// `constraintsStart: GenericParameterConstraintIndex`,
+/// `constraintsCount: int16_t`, `num: uint16_t`, `flags: uint16_t`). On
+/// `il2cpp_v29`/`il2cpp_v31`, this is what `Il2CppType`'s
+/// `genericParameterHandle` union member points to: il2cpp mmaps its global
+/// metadata file directly into the process and hands out pointers straight
+/// into that mapping, so this struct's layout mirrors the file format
+/// exactly rather than some separately-materialized runtime representation -
+/// see
+/// [`Il2CppType::generic_parameter_index`](crate::Il2CppType::generic_parameter_index).
+///
+/// With the `bindgen` feature, this is instead generated directly from that
+/// header (added to `wrapper.h`), which is the same layout by construction;
+/// this hand-written copy only backs the vendored, pre-generated
+/// `types_v31`/`types_v24`/`types_2018` fallback used when `bindgen` is off.
+#[cfg(not(feature = "bindgen"))]
+#[repr(C)]
+pub struct Il2CppGenericParameter {
+    pub owner_index: i32,
+    pub name_index: i32,
+    pub constraints_start: i16,
+    pub constraints_count: i16,
+    /// This parameter's 0-based position in its owner's parameter list -
+    /// e.g. for `Foo<T, U>`, `T`'s `num` is 0 and `U`'s is 1.
+    pub num: u16,
+    pub flags: u16,
+}
+
+/// A generic container's own metadata entry - matches
+/// `vm/GlobalMetadataFileInternals.h`'s `Il2CppGenericContainer` exactly
+/// (`ownerIndex: i32`, `type_argc: i32`, `is_method: i32`,
+/// `genericParameterStart: GenericParameterIndex`). On `il2cpp_v29`/
+/// `il2cpp_v31`, a generic (non-inflated) [`MethodInfo`]'s
+/// `genericContainerHandle` union member points directly at one of these in
+/// the mmap'd global metadata file, the same way `Il2CppType`'s
+/// `genericParameterHandle` points at an [`Il2CppGenericParameter`] - see
+/// [`MethodInfo::generic_parameter_count`](crate::MethodInfo::generic_parameter_count).
+///
+/// With the `bindgen` feature, this is instead generated directly from that
+/// header, which is the same layout by construction; this hand-written copy
+/// only backs the vendored, pre-generated `types_v31`/`types_v24`/
+/// `types_2018` fallback used when `bindgen` is off.
+#[cfg(not(feature = "bindgen"))]
+#[repr(C)]
+pub struct Il2CppGenericContainer {
+    pub owner_index: i32,
+    pub type_argc: i32,
+    pub is_method: i32,
+    pub generic_parameter_start: i32,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

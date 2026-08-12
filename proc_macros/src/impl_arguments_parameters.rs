@@ -8,10 +8,10 @@ pub fn expand(range: Range<usize>) -> Result<TokenStream> {
     let mut ts = TokenStream::new();
     for n in range {
         let generic_params_argument = (1..=n).map(|n| format_ident!("A{}", n));
-        let matches_argument = generic_params_argument
+        let matches_types_argument = generic_params_argument
             .clone()
             .enumerate()
-            .map(|(n, gp)| quote!(<#gp>::matches(params.get_unchecked(#n).ty())));
+            .map(|(n, gp)| quote!(<#gp>::matches(tys[#n])));
         let invokables = (0..n).map(Index::from).map(|n| quote!(self.#n.invokable()));
 
         let generic_params_parameter = (1..=n).map(|n| format_ident!("P{}", n));
@@ -47,9 +47,8 @@ pub fn expand(range: Range<usize>) -> Result<TokenStream> {
             {
                 type Type = (#(#generic_params_argument_type::Type,)*);
 
-                fn matches(method: &MethodInfo) -> bool {
-                    let params = method.parameters();
-                    params.len() == #n && unsafe { #(#matches_argument) && * }
+                fn matches(tys: &[&Il2CppType]) -> bool {
+                    tys.len() == #n && #(#matches_types_argument) && *
                 }
 
                 fn classes() -> [&'static Il2CppClass; #n] {
