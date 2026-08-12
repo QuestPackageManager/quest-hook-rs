@@ -69,3 +69,7 @@ required-features = ["util", "xref"]
 name = "thread"
 crate-type = ["cdylib"]
 required-features = ["util"]
+[[example]]
+name = "generics"
+crate-type = ["cdylib"]
+required-features = ["util"]
