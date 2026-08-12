@@ -42,9 +42,9 @@ impl MethodInfo {
         A: Arguments<N>,
         R: Returned,
     {
-        assert!(T::matches(self));
-        assert!(A::matches(self));
-        assert!(R::matches(self.return_ty()));
+        assert!(T::matches_method(self));
+        assert!(A::matches_method(self));
+        assert!(R::matches_method(self));
 
         unsafe { self.invoke_unchecked(this, args) }
     }
@@ -145,6 +145,34 @@ impl MethodInfo {
         unsafe { raw::method_is_generic(self.raw()) }
     }
 
+    /// Number of the method's own generic type parameters (`0` for a
+    /// non-generic method) - e.g. `2` for `Foo<T, U>()`. Mirrors
+    /// beatsaber-hook's `GetGenericContainer` (`il2cpp-utils-methods.hpp`),
+    /// but only its non-inflated branch: methods reached by walking
+    /// [`Il2CppClass::methods`](crate::Il2CppClass::methods) during
+    /// [`Il2CppClass::find_method`](crate::Il2CppClass::find_method)'s
+    /// overload resolution are always generic *definitions*, never
+    /// already-[`make_generic`](Self::make_generic)'d instances, so the
+    /// `genericMethod`/`genericContainer(Handle)` union always holds the
+    /// container side here, not the inflated `genericMethod` side.
+    pub fn generic_parameter_count(&self) -> u32 {
+        if !self.is_generic() {
+            return 0;
+        }
+
+        #[cfg(any(feature = "il2cpp_v31", feature = "il2cpp_v29"))]
+        let type_argc = unsafe {
+            let handle = self.raw().__bindgen_anon_2.genericContainerHandle;
+            let il2_cpp_generic_container = *handle.cast::<raw::Il2CppGenericContainer>();
+            il2_cpp_generic_container.type_argc
+        };
+
+        #[cfg(any(feature = "il2cpp_v24", feature = "unity2018"))]
+        let type_argc = unsafe { (*self.raw().__bindgen_anon_2.genericContainer).type_argc };
+
+        type_argc as u32
+    }
+
     /// The method's vtable slot
     pub fn slot(&self) -> u16 {
         self.raw().slot
@@ -154,9 +182,24 @@ impl MethodInfo {
     /// arguments, returning the resulting concrete method - mirrors
     /// [`Il2CppClass::make_generic`], via
     /// [`Il2CppReflectionMethod::make_generic`]
-    /// (`MethodInfo.MakeGenericMethod`).
-    /// 
-    /// https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/src/types.cpp#L328-L363
+    /// (`MethodInfo.MakeGenericMethod`). Ports beatsaber-hook's
+    /// [`i2c::make_generic(MethodInfo const*, ...)`](https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/src/types.cpp#L328-L363).
+    ///
+    /// `self` has to already be a generic method *definition* - found via
+    /// [`Il2CppClass::find_method`](crate::Il2CppClass::find_method) with a
+    /// non-`()` `G` (substitutes the same `G` in for any `T`-typed parameter
+    /// before matching, so overloads can be disambiguated) or the simpler
+    /// [`Il2CppClass::find_method_unchecked`](crate::Il2CppClass::find_method_unchecked)
+    /// (name + parameter *count* only) - either way, via something other
+    /// than [`Il2CppClass::find_method`](crate::Il2CppClass::find_method),
+    /// whose type checking assumes already-concrete parameter types, which
+    /// a generic method's aren't until it's instantiated.
+    ///
+    /// The method `make_generic` returns, on the other hand, *is* already
+    /// concrete - il2cpp substitutes `T`/`U`/... into real types as part of
+    /// instantiating it, return type included - so the typed, checked
+    /// [`invoke`](Self::invoke) works normally on the result, the same as
+    /// any non-generic method.
     pub fn make_generic<G>(&self) -> Result<Option<&'static Self>>
     where
         G: Generics,
@@ -230,8 +273,8 @@ impl Il2CppReflectionMethod {
     /// arguments - mirrors
     /// [`Il2CppReflectionType::make_generic`](crate::Il2CppReflectionType::make_generic),
     /// calling `MethodInfo.MakeGenericMethod` via reflection.
-    /// 
-    /// https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/src/types.cpp#L113-L133
+    ///
+    /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/src/types.cpp#L113-L133>
     pub fn make_generic<G>(&self) -> Result<Option<&Self>>
     where
         G: Generics,

@@ -24,7 +24,7 @@ impl Il2CppObject {
         A: Arguments<N>,
         R: Returned,
     {
-        let method = self.class().find_method::<A, R, N>(name).unwrap();
+        let method = self.class().find_method::<A, (), R, N>(name).unwrap();
         unsafe { method.invoke_unchecked(self, args) }
     }
 
@@ -38,7 +38,7 @@ impl Il2CppObject {
     where
         A: Arguments<N>,
     {
-        let method = self.class().find_method::<A, (), N>(name).unwrap();
+        let method = self.class().find_method::<A, (), (), N>(name).unwrap();
         unsafe { method.invoke_unchecked(self, args) }
     }
 

@@ -20,7 +20,7 @@ pub unsafe trait ThisArgument {
 
     /// Checks whether the type can be used as a C# `this` argument for the
     /// given [`MethodInfo`]
-    fn matches(method: &MethodInfo) -> bool;
+    fn matches_method(method: &MethodInfo) -> bool;
 
     /// Returns an untyped pointer which can be used as a libill2cpp `this`
     /// argument
@@ -65,6 +65,12 @@ pub unsafe trait Returned {
     /// Normalized type of the return type, useful for caching
     type Type: Any;
 
+    /// Checks whether the type can be used as the return type of the given
+    /// [`MethodInfo`]
+    fn matches_method(method: &MethodInfo) -> bool {
+        Self::matches(method.return_ty())
+    }
+
     /// Checks whether the type can be used as a C# return type of the given
     /// [`Il2CppType`]
     fn matches(ty: &Il2CppType) -> bool;
@@ -88,7 +94,21 @@ pub unsafe trait Arguments<const N: usize> {
 
     /// Checks whether the type can be used as a C# argument collection for the
     /// given [`MethodInfo`]
-    fn matches(method: &MethodInfo) -> bool;
+    fn matches_method(method: &MethodInfo) -> bool {
+        let params = method.parameters();
+        params.len() == N && Self::matches(&params.iter().map(|p| p.ty()).collect::<Vec<_>>())
+    }
+
+    /// Checks whether the type can be used as a C# argument collection
+    /// against an explicit list of [`Il2CppType`]s, rather than pulling them
+    /// from a [`MethodInfo`]'s declared parameters directly like
+    /// [`matches`](Arguments::matches) does - used by
+    /// [`Il2CppClass::find_method`](crate::Il2CppClass::find_method) to
+    /// type-check a generic method's parameters after substituting its own
+    /// type parameters with concrete ones (mirrors beatsaber-hook's
+    /// `ParameterMatch` substituting into a `paramType` before calling
+    /// `IsConvertibleFrom`, `il2cpp-utils-methods.hpp`).
+    fn matches(tys: &[&Il2CppType]) -> bool;
 
     /// [`Il2CppClass`]es of each argument's static type, in order - see
     /// [`Argument::class`]
@@ -105,7 +125,7 @@ where
 {
     type Type = T;
 
-    fn matches(method: &MethodInfo) -> bool {
+    fn matches_method(method: &MethodInfo) -> bool {
         T::matches_this_argument(method)
     }
 
@@ -119,7 +139,7 @@ where
 {
     type Type = T;
 
-    fn matches(method: &MethodInfo) -> bool {
+    fn matches_method(method: &MethodInfo) -> bool {
         T::matches_this_argument(method)
     }
 
@@ -133,7 +153,7 @@ where
 {
     type Type = T;
 
-    fn matches(method: &MethodInfo) -> bool {
+    fn matches_method(method: &MethodInfo) -> bool {
         T::matches_this_argument(method)
     }
 
@@ -147,7 +167,7 @@ where
 {
     type Type = T;
 
-    fn matches(method: &MethodInfo) -> bool {
+    fn matches_method(method: &MethodInfo) -> bool {
         T::matches_this_argument(method)
     }
 
@@ -162,7 +182,7 @@ where
 {
     type Type = T;
 
-    fn matches(method: &MethodInfo) -> bool {
+    fn matches_method(method: &MethodInfo) -> bool {
         T::matches_this_argument(method)
     }
 
@@ -174,7 +194,7 @@ where
 unsafe impl ThisArgument for () {
     type Type = ();
 
-    fn matches(method: &MethodInfo) -> bool {
+    fn matches_method(method: &MethodInfo) -> bool {
         method.is_static()
     }
 
@@ -432,8 +452,12 @@ unsafe impl Returned for () {
 unsafe impl Arguments<0> for () {
     type Type = ();
 
-    fn matches(method: &MethodInfo) -> bool {
+    fn matches_method(method: &MethodInfo) -> bool {
         method.parameters().is_empty()
+    }
+
+    fn matches(tys: &[&Il2CppType]) -> bool {
+        tys.is_empty()
     }
 
     fn classes() -> [&'static Il2CppClass; 0] {
@@ -451,9 +475,13 @@ where
 {
     type Type = (A::Type,);
 
-    fn matches(method: &MethodInfo) -> bool {
+    fn matches_method(method: &MethodInfo) -> bool {
         let params = method.parameters();
         params.len() == 1 && unsafe { A::matches(params.get_unchecked(0).ty()) }
+    }
+
+    fn matches(tys: &[&Il2CppType]) -> bool {
+        tys.len() == 1 && A::matches(tys[0])
     }
 
     fn classes() -> [&'static Il2CppClass; 1] {

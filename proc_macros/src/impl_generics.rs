@@ -20,6 +20,7 @@ pub fn expand(range: Range<usize>) -> Result<TokenStream> {
         let generics_impl = generics.clone();
         let generics_ty = generics.clone();
         let generics_where = generics.clone();
+        let generics_classes = generics.clone();
 
         let impl_ts = quote! {
             impl<#(#generics_impl),*> Generics for (#(#generics_ty,)*)
@@ -34,6 +35,10 @@ pub fn expand(range: Range<usize>) -> Result<TokenStream> {
                         #(#ptr_write)*
                     }
                     arr
+                }
+
+                fn classes() -> Vec<&'static Il2CppClass> {
+                    vec![#(#generics_classes::class()),*]
                 }
             }
         };

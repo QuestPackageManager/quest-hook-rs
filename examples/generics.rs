@@ -30,13 +30,15 @@ fn get_transform(this: &mut Component) -> Gc<Il2CppObject> {
         .expect("List<Rigidbody> should exist");
     debug!("List<Rigidbody> is {list_class}");
 
-    // Generic *method*: `Component.GetComponent<T>()`. `T` is a type
-    // parameter, not a regular parameter, so the *un-instantiated*
-    // definition still has 0 parameters - found by name and parameter count
-    // rather than `find_method`, whose type checking assumes an
-    // already-concrete signature.
+    // Generic *method*: `Component.GetComponent<T>()`. Passing a non-`()`
+    // `G` to `find_method` (unlike its plain `G = ()` form, whose type
+    // checking assumes an already-concrete signature) substitutes
+    // `Rigidbody` in for `T` before comparing parameters, so it can pick the
+    // right overload out of several even before this method is instantiated
+    // - here there are 0 regular parameters (`T` is a type parameter, not
+    // one) and no return type to check yet either, so `()`/`()`/`0`.
     let get_component = Component::class()
-        .find_method_unchecked("GetComponent", 0)
+        .find_method::<(), Rigidbody, (), 0>("GetComponent")
         .expect("Component.GetComponent<T>() should exist");
 
     // Instantiate it for `T = Rigidbody`, the same way C#'s
@@ -46,11 +48,15 @@ fn get_transform(this: &mut Component) -> Gc<Il2CppObject> {
         .expect("MakeGenericMethod should succeed")
         .expect("GetComponent<T>() is generic, so this always succeeds");
 
-    // Call the now-concrete method - through `invoke_unchecked` rather than
-    // the typed `invoke`, since (like `find_method_unchecked` above) type
-    // checking assumes an already-concrete signature.
-    let rigidbody: Gc<Rigidbody> =
-        unsafe { get_component_rigidbody.invoke_unchecked(&mut *this, ()) }.unwrap();
+    // Call the now-concrete method through the typed, checked `invoke` -
+    // unlike the un-instantiated definition above (which `find_method` had
+    // to look up via substitution, since its own parameters/return type are
+    // still `T` placeholders with no real class to check against),
+    // `make_generic` hands back a real, inflated `MethodInfo`: il2cpp has
+    // already substituted `T` -> `Rigidbody` into concrete types wherever it
+    // appears, including the return type here, so ordinary type checking
+    // applies to it exactly like any other non-generic method.
+    let rigidbody: Gc<Rigidbody> = get_component_rigidbody.invoke(&mut *this, ()).unwrap();
     debug!(
         "found rigidbody: {:?}",
         rigidbody.as_ref().map(|r| r.class())
