@@ -5,8 +5,8 @@ use std::mem::transmute;
 use std::{fmt, ptr, slice, vec};
 
 use crate::{
-    raw, Arguments, FieldInfo, Gc, Generics, Il2CppException, Il2CppType, MethodInfo, Parameters,
-    PropertyInfo, Return, Returned, ThisParameter, Type, WrapRaw,
+    Arguments, FieldInfo, Gc, Generics, Il2CppException, Il2CppType, MethodInfo, Parameters,
+    PropertyInfo, Return, Returned, ThisParameter, Type, WrapRaw, raw,
 };
 
 #[cfg(feature = "il2cpp_v31")]
@@ -196,6 +196,13 @@ impl Il2CppClass {
         Ok(method)
     }
 
+    /// Every method declared on `self` or any of its parents, in hierarchy
+    /// order - the shared traversal [`resolve_method`](Self::resolve_method)
+    /// and [`find_method_callee`](Self::find_method_callee) both walk.
+    fn hierarchy_methods(&self) -> impl Iterator<Item = &'static MethodInfo> + '_ {
+        self.hierarchy().flat_map(|c| c.methods().iter().copied())
+    }
+
     /// Shared implementation of [`find_method`](Self::find_method) and
     /// [`find_static_method`](Self::find_static_method)
     ///
@@ -221,29 +228,27 @@ impl Il2CppClass {
         let mut best_weight = i32::MAX;
         let mut multiple = false;
 
-        'hierarchy: for c in self.hierarchy() {
-            for mi in c.methods().iter().copied() {
-                if mi.name() != name
-                    || (static_only && !mi.is_static())
-                    || mi.parameters().len() != N
-                    || mi.generic_parameter_count() as usize != G::COUNT
-                    || (G::COUNT == 0 && !R::matches(mi.return_ty()))
-                {
-                    continue;
-                }
+        for mi in self.hierarchy_methods() {
+            if mi.name() != name
+                || (static_only && !mi.is_static())
+                || mi.parameters().len() != N
+                || mi.generic_parameter_count() as usize != G::COUNT
+                || (G::COUNT == 0 && !R::matches(mi.return_ty()))
+            {
+                continue;
+            }
 
-                match method_weight::<A, N>(mi, &arg_classes, &generics) {
-                    Some(Closeness::Exact) => {
-                        best = Some(mi);
-                        break 'hierarchy;
-                    }
-                    Some(Closeness::Convertible(w)) if w < best_weight => {
-                        multiple = best.is_some();
-                        best_weight = w;
-                        best = Some(mi);
-                    }
-                    Some(Closeness::Convertible(_)) | None => {}
+            match method_weight::<A, N>(mi, &arg_classes, &generics) {
+                Some(Closeness::Exact) => {
+                    best = Some(mi);
+                    break;
                 }
+                Some(Closeness::Convertible(w)) if w < best_weight => {
+                    multiple = best.is_some();
+                    best_weight = w;
+                    best = Some(mi);
+                }
+                Some(Closeness::Convertible(_)) | None => {}
             }
         }
 
@@ -267,6 +272,12 @@ impl Il2CppClass {
 
     /// Find a method belonging to the class or its parents by name with type
     /// checking from a callee perspective
+    ///
+    /// This is mostly used for finding methods for a hook installation. Uses
+    /// the same [`hierarchy_methods`](Self::hierarchy_methods) walk as
+    /// [`resolve_method`](Self::resolve_method) - a method declared only on
+    /// a base class (e.g. an un-overridden Unity callback) is found the same
+    /// way here as it is by [`find_method`](Self::find_method).
     #[crate::instrument(level = "debug")]
     pub fn find_method_callee<T, P, R>(
         &self,
@@ -279,24 +290,23 @@ impl Il2CppClass {
     {
         debug!("Looking for method: {}", name);
 
-        let mut matching = self
-            .methods()
-            .iter()
-            .filter(|mi| {
-                debug!("Looking for method: {}", name);
-                debug!("mi.name() == name: {}", mi.name() == name);
-                debug!("T::matches(mi): {}", T::matches(mi));
-                debug!(
-                    "P::matches(mi): {} count {} method {}",
-                    P::matches(mi),
-                    P::COUNT,
-                    mi.parameters().len()
-                );
-                debug!("R::matches(mi.return_ty()): {}", R::matches(mi.return_ty()));
-                debug!("");
-                mi.name() == name && T::matches(mi) && P::matches(mi) && R::matches(mi.return_ty())
-            })
-            .copied();
+        let mut matching = self.hierarchy_methods().filter(|mi| {
+            debug!("Looking for method: {}", name);
+            debug!("mi.name() == name: {}", mi.name() == name);
+            debug!("T::matches(mi): {}", T::matches(mi));
+            debug!(
+                "P::matches(mi): {} count {} method {}",
+                P::matches_method(mi),
+                P::COUNT,
+                mi.parameters().len()
+            );
+            debug!("R::matches(mi.return_ty()): {}", R::matches(mi.return_ty()));
+            debug!("");
+            mi.name() == name
+                && T::matches(mi)
+                && P::matches_method(mi)
+                && R::matches(mi.return_ty())
+        });
 
         match (matching.next(), matching.next()) {
             // one method found
@@ -320,11 +330,18 @@ impl Il2CppClass {
             }
             // none
             _ => {
+                // `Parameters` only describes arity, not individual parameter
+                // types, so the best we can report is the Rust-side type
+                // that was expected for the (single) parameter, if any.
+                let parameters = if P::COUNT == 0 {
+                    Vec::new()
+                } else {
+                    vec![std::any::type_name::<P>().to_string()]
+                };
                 let info = FindMethodParameters {
                     ty_name: self.to_string(),
                     method_name: name.to_string(),
-                    // TODO!
-                    parameters: vec![format!("UNABLE TO PROVIDE! Count {}", P::COUNT)],
+                    parameters,
                 };
                 Err(FindMethodError::None(info))
             }
@@ -380,10 +397,13 @@ impl Il2CppClass {
             }
         }
 
+        // This lookup is unchecked - only the arity is known, not the
+        // individual parameter types - so report one placeholder per
+        // parameter instead of a single value that misrepresents the count.
         let info = FindMethodParameters {
             ty_name: self.to_string(),
             method_name: name.to_string(),
-            parameters: vec![format!("UNABLE TO PROVIDE! Count {}", parameters_count)],
+            parameters: vec!["<unknown>".to_string(); parameters_count],
         };
 
         Err(FindMethodError::None(info))
