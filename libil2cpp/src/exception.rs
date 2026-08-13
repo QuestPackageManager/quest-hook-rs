@@ -2,7 +2,7 @@ use std::ffi::CStr;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::ops::{Deref, DerefMut};
 
-use crate::{raw, Gc, Il2CppObject, Il2CppString, WrapRaw};
+use crate::{raw, Gc, Il2CppObject, Il2CppString, RefType, WrapRaw};
 
 /// An il2cpp exception
 #[repr(transparent)]
@@ -66,17 +66,29 @@ impl<'a> Iterator for Trace<'a> {
     }
 }
 
+impl AsRef<Il2CppObject> for Il2CppException {
+    fn as_ref(&self) -> &Il2CppObject {
+        unsafe { Il2CppObject::wrap(&self.raw().object) }
+    }
+}
+
+impl AsMut<Il2CppObject> for Il2CppException {
+    fn as_mut(&mut self) -> &mut Il2CppObject {
+        unsafe { Il2CppObject::wrap_mut(&mut self.raw_mut().object) }
+    }
+}
+
 impl Deref for Il2CppException {
     type Target = Il2CppObject;
 
     fn deref(&self) -> &Self::Target {
-        unsafe { Il2CppObject::wrap(&self.raw().object) }
+        self.as_ref()
     }
 }
 
 impl DerefMut for Il2CppException {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { Il2CppObject::wrap_mut(&mut self.raw_mut().object) }
+        self.as_mut()
     }
 }
 
@@ -97,7 +109,7 @@ impl fmt::Display for Il2CppException {
 impl fmt::Debug for Il2CppException {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Il2CppException")
-            .field("class", self.class())
+            .field("class", self.as_object().class())
             .field("message", &self.message())
             .field("source", &self.source())
             .finish()

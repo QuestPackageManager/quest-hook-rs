@@ -52,17 +52,29 @@ unsafe impl WrapRaw for Il2CppString {
     type Raw = raw::Il2CppString;
 }
 
+impl AsRef<Il2CppObject> for Il2CppString {
+    fn as_ref(&self) -> &Il2CppObject {
+        unsafe { Il2CppObject::wrap(&self.raw().object) }
+    }
+}
+
+impl AsMut<Il2CppObject> for Il2CppString {
+    fn as_mut(&mut self) -> &mut Il2CppObject {
+        unsafe { Il2CppObject::wrap_mut(&mut self.raw_mut().object) }
+    }
+}
+
 impl Deref for Il2CppString {
     type Target = Il2CppObject;
 
     fn deref(&self) -> &Self::Target {
-        unsafe { Il2CppObject::wrap(&self.raw().object) }
+        self.as_ref()
     }
 }
 
 impl DerefMut for Il2CppString {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { Il2CppObject::wrap_mut(&mut self.raw_mut().object) }
+        self.as_mut()
     }
 }
 

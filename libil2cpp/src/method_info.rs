@@ -8,7 +8,7 @@ use std::{fmt, slice};
 use crate::raw::{METHOD_ATTRIBUTE_ABSTRACT, METHOD_ATTRIBUTE_STATIC, METHOD_ATTRIBUTE_VIRTUAL};
 use crate::{
     raw, Arguments, Gc, Generics, Il2CppArray, Il2CppClass, Il2CppException, Il2CppObject,
-    Il2CppReflectionType, Il2CppType, ParameterInfo, Returned, ThisArgument, WrapRaw,
+    Il2CppReflectionType, Il2CppType, ParameterInfo, RefType, Returned, ThisArgument, WrapRaw,
 };
 
 #[cfg(feature = "il2cpp_v31")]
@@ -309,6 +309,7 @@ impl Il2CppReflectionMethod {
     /// <https://github.com/QuestPackageManager/beatsaber-hook/blob/7632eb7bf2634dabbf3cade1df140e5d93f48845/src/types.cpp#L113-L133>
     pub fn make_generic_with(&self, classes: &[&'static Il2CppClass]) -> Result<Option<&Self>> {
         let make_generic = self
+            .as_object()
             .class()
             .find_method_unchecked("MakeGenericMethod", 2)
             .unwrap();
@@ -335,17 +336,29 @@ impl Il2CppReflectionMethod {
     }
 }
 
+impl AsRef<Il2CppObject> for Il2CppReflectionMethod {
+    fn as_ref(&self) -> &Il2CppObject {
+        unsafe { Il2CppObject::wrap(&self.raw().object) }
+    }
+}
+
+impl AsMut<Il2CppObject> for Il2CppReflectionMethod {
+    fn as_mut(&mut self) -> &mut Il2CppObject {
+        unsafe { Il2CppObject::wrap_mut(&mut self.raw_mut().object) }
+    }
+}
+
 impl Deref for Il2CppReflectionMethod {
     type Target = Il2CppObject;
 
     fn deref(&self) -> &Self::Target {
-        unsafe { Il2CppObject::wrap(&self.raw().object) }
+        self.as_ref()
     }
 }
 
 impl DerefMut for Il2CppReflectionMethod {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { Il2CppObject::wrap_mut(&mut self.raw_mut().object) }
+        self.as_mut()
     }
 }
 

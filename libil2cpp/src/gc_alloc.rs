@@ -244,8 +244,8 @@ mod tests {
 
     /// A stand-in for `UnityEngine.Transform` - matching the one in `gc.rs`'s
     /// tests, just enough of a `Type` impl to satisfy `SafePtr<T>`'s bound.
-    /// Its `matches_*`/`Deref` bodies are `unimplemented!()` since nothing
-    /// under test calls into the runtime.
+    /// Its `matches_*`/`AsRef`/`AsMut` bodies are `unimplemented!()` since
+    /// nothing under test calls into the runtime.
     #[repr(C)]
     struct Transform {
         #[allow(dead_code)]
@@ -273,16 +273,14 @@ mod tests {
         }
     }
 
-    impl Deref for Transform {
-        type Target = Il2CppObject;
-
-        fn deref(&self) -> &Il2CppObject {
+    impl AsRef<Il2CppObject> for Transform {
+        fn as_ref(&self) -> &Il2CppObject {
             unimplemented!()
         }
     }
 
-    impl DerefMut for Transform {
-        fn deref_mut(&mut self) -> &mut Il2CppObject {
+    impl AsMut<Il2CppObject> for Transform {
+        fn as_mut(&mut self) -> &mut Il2CppObject {
             unimplemented!()
         }
     }
@@ -320,16 +318,14 @@ mod tests {
         }
     }
 
-    impl Deref for RectTransform {
-        type Target = Il2CppObject;
-
-        fn deref(&self) -> &Il2CppObject {
+    impl AsRef<Il2CppObject> for RectTransform {
+        fn as_ref(&self) -> &Il2CppObject {
             unimplemented!()
         }
     }
 
-    impl DerefMut for RectTransform {
-        fn deref_mut(&mut self) -> &mut Il2CppObject {
+    impl AsMut<Il2CppObject> for RectTransform {
+        fn as_mut(&mut self) -> &mut Il2CppObject {
             unimplemented!()
         }
     }

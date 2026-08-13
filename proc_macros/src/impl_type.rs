@@ -298,23 +298,23 @@ impl Input {
         let impl_ = quote!(impl<#(#generics: #type_trait),*>);
         let type_ = quote!(#ty<#(#generics),*>);
 
-        // `Deref`/`DerefMut` to the embedded `Il2CppObject` header is all
+        // `AsRef`/`AsMut` to the embedded `Il2CppObject` header is all
         // that's needed - the blanket `RefType`/`ObjectExt` impls in
-        // `crate::object` pick this type up automatically from there,
-        // and it also gives autoderef access to `Il2CppObject`'s own
-        // methods (`invoke`, `load`, `store`, ...).
+        // `crate::object` pick this type up automatically from there.
+        // Deliberately not `Deref`/`DerefMut`: reaching `Il2CppObject`'s own
+        // methods (`invoke`, `load`, `store`, ...) from here requires an
+        // explicit `.as_object()`/`.as_object_mut()` call instead of
+        // silent autoderef.
         quote! {
-            #impl_ ::std::ops::Deref for #type_ {
-                type Target = #path::Il2CppObject;
-
-                fn deref(&self) -> &Self::Target {
-                    &self.#field
+            #impl_ ::std::convert::AsRef<#path::Il2CppObject> for #type_ {
+                fn as_ref(&self) -> &#path::Il2CppObject {
+                    AsRef::<#path::Il2CppObject>::as_ref(&self.#field)
                 }
             }
 
-            #impl_ ::std::ops::DerefMut for #type_ {
-                fn deref_mut(&mut self) -> &mut Self::Target {
-                    &mut self.#field
+            #impl_ ::std::convert::AsMut<#path::Il2CppObject> for #type_ {
+                fn as_mut(&mut self) -> &mut #path::Il2CppObject {
+                    AsMut::<#path::Il2CppObject>::as_mut(&mut self.#field)
                 }
             }
         }

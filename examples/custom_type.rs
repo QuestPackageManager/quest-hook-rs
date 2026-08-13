@@ -1,4 +1,4 @@
-use libil2cpp::{Gc, Il2CppArray, ObjectExt, Type};
+use libil2cpp::{Gc, Il2CppArray, ObjectExt, RefType, Type};
 use quest_hook::hook;
 use quest_hook::libil2cpp::{unsafe_impl_reference_type, unsafe_impl_value_type, Il2CppObject};
 use tracing::debug;
@@ -15,8 +15,8 @@ unsafe_impl_value_type!(in quest_hook::libil2cpp for Vector3 => UnityEngine.Vect
 
 // A C# class (UnityEngine.Transform) - a plain, non-generic reference type.
 // Naming its `object` field lets `unsafe_impl_reference_type!` implement
-// `Deref`/`DerefMut` to `Il2CppObject` for us, so `invoke` works directly on
-// a `&mut Transform` below without going through `.as_object_mut()`.
+// `AsRef`/`AsMut` to `Il2CppObject` for us, so `RefType::as_object_mut()`
+// reaches `invoke` on a `&mut Transform` below.
 #[repr(C)]
 pub struct Transform {
     object: Il2CppObject,
@@ -50,22 +50,24 @@ fn set_position(this: &mut Il2CppObject, new_position: Vector3) {
     let old_position: Vector3 = this.invoke("get_position", ()).unwrap();
     debug!("{:?} -> {:?}", old_position, new_position);
 
-    // `Transform` (plain reference type): autoderef through the
-    // `Deref<Target = Il2CppObject>` the macro generated makes `invoke`
-    // callable directly on `transform`.
+    // `Transform` (plain reference type): `RefType::as_object_mut()` reaches
+    // `Il2CppObject::invoke` through the `AsMut<Il2CppObject>` the macro
+    // generated.
     let transform: &mut Transform = this.invoke("get_transform", ()).unwrap();
     // `Nullable<Vector3>` (generic value type): a target the rigidbody is
     // easing towards, if any.
-    let target_position: Nullable<Vector3> = transform.invoke("get_targetPosition", ()).unwrap();
+    let target_position: Nullable<Vector3> = transform
+        .as_object_mut()
+        .invoke("get_targetPosition", ())
+        .unwrap();
     debug!("target position: {:?}", target_position);
 
-    // `List<Vector3>` (generic reference type): `ObjectExt::new` - picked up
-    // the same way as `Transform`'s `invoke` above - is the equivalent of
-    // C#'s `new List<Vector3>()`.
+    // `List<Vector3>` (generic reference type): `ObjectExt::new` is the
+    // equivalent of C#'s `new List<Vector3>()`.
     let recent_positions: Gc<List<Vector3>> = List::new(());
     debug!(
         "tracking recent positions in {:?}",
-        recent_positions.class()
+        recent_positions.as_object().class()
     );
 
     set_position.original(this, new_position)

@@ -14,7 +14,9 @@ use crate::raw::{
     Il2CppTypeEnum_IL2CPP_TYPE_U1, Il2CppTypeEnum_IL2CPP_TYPE_U2, Il2CppTypeEnum_IL2CPP_TYPE_U4,
     Il2CppTypeEnum_IL2CPP_TYPE_U8, Il2CppTypeEnum_IL2CPP_TYPE_VAR, Il2CppTypeEnum_IL2CPP_TYPE_VOID,
 };
-use crate::{raw, Gc, Generics, Il2CppArray, Il2CppClass, Il2CppException, Il2CppObject, WrapRaw};
+use crate::{
+    raw, Gc, Generics, Il2CppArray, Il2CppClass, Il2CppException, Il2CppObject, RefType, WrapRaw,
+};
 
 /// An il2cpp type
 #[repr(transparent)]
@@ -239,6 +241,7 @@ impl Il2CppReflectionType {
         classes: &[&'static Il2CppClass],
     ) -> Result<Option<&Self>, Gc<Il2CppException>> {
         let make_generic = self
+            .as_object()
             .class()
             .find_method_unchecked("MakeGenericType", 2)
             .unwrap();
@@ -265,17 +268,29 @@ impl Il2CppReflectionType {
     }
 }
 
+impl AsRef<Il2CppObject> for Il2CppReflectionType {
+    fn as_ref(&self) -> &Il2CppObject {
+        unsafe { Il2CppObject::wrap(&self.raw().object) }
+    }
+}
+
+impl AsMut<Il2CppObject> for Il2CppReflectionType {
+    fn as_mut(&mut self) -> &mut Il2CppObject {
+        unsafe { Il2CppObject::wrap_mut(&mut self.raw_mut().object) }
+    }
+}
+
 impl Deref for Il2CppReflectionType {
     type Target = Il2CppObject;
 
     fn deref(&self) -> &Self::Target {
-        unsafe { Il2CppObject::wrap(&self.raw().object) }
+        self.as_ref()
     }
 }
 
 impl DerefMut for Il2CppReflectionType {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { Il2CppObject::wrap_mut(&mut self.raw_mut().object) }
+        self.as_mut()
     }
 }
 

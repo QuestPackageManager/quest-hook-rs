@@ -1,5 +1,7 @@
 use quest_hook::hook;
-use quest_hook::libil2cpp::{unsafe_impl_reference_type, Gc, Il2CppClass, Il2CppObject, Type};
+use quest_hook::libil2cpp::{
+    unsafe_impl_reference_type, Gc, Il2CppClass, Il2CppObject, RefType, Type,
+};
 use tracing::debug;
 
 // A C# class (UnityEngine.Component) - `GetComponent<T>()`, the generic
@@ -59,7 +61,7 @@ fn get_transform(this: &mut Component) -> Gc<Il2CppObject> {
     let rigidbody: Gc<Rigidbody> = get_component_rigidbody.invoke(&mut *this, ()).unwrap();
     debug!(
         "found rigidbody: {:?}",
-        rigidbody.as_ref().map(|r| r.class())
+        rigidbody.as_ref().map(|r| r.as_object().class())
     );
 
     get_transform.original(this)

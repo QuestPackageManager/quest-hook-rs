@@ -141,20 +141,31 @@ where
     }
 }
 
+impl<T: Type> AsRef<Il2CppObject> for Il2CppArray<T> {
+    fn as_ref(&self) -> &Il2CppObject {
+        unsafe { Il2CppObject::wrap(&self.raw().obj) }
+    }
+}
+
+impl<T: Type> AsMut<Il2CppObject> for Il2CppArray<T> {
+    fn as_mut(&mut self) -> &mut Il2CppObject {
+        unsafe { Il2CppObject::wrap_mut(&mut self.raw_mut().obj) }
+    }
+}
+
 impl<T: Type> Deref for Il2CppArray<T> {
     type Target = Il2CppObject;
 
     fn deref(&self) -> &Self::Target {
-        unsafe { Il2CppObject::wrap(&self.raw().obj) }
+        self.as_ref()
     }
 }
 
 impl<T: Type> DerefMut for Il2CppArray<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { Il2CppObject::wrap_mut(&mut self.raw_mut().obj) }
+        self.as_mut()
     }
 }
-
 #[cfg(feature = "serde")]
 mod serde {
     use crate::Gc;
