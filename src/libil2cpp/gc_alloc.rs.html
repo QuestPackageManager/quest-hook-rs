@@ -244,8 +244,8 @@
 <a href=#244 id=244 data-nosnippet>244</a>
 <a href=#245 id=245 data-nosnippet>245</a>    <span class="doccomment">/// A stand-in for `UnityEngine.Transform` - matching the one in `gc.rs`'s
 <a href=#246 id=246 data-nosnippet>246</a>    /// tests, just enough of a `Type` impl to satisfy `SafePtr&lt;T&gt;`'s bound.
-<a href=#247 id=247 data-nosnippet>247</a>    /// Its `matches_*`/`Deref` bodies are `unimplemented!()` since nothing
-<a href=#248 id=248 data-nosnippet>248</a>    /// under test calls into the runtime.
+<a href=#247 id=247 data-nosnippet>247</a>    /// Its `matches_*`/`AsRef`/`AsMut` bodies are `unimplemented!()` since
+<a href=#248 id=248 data-nosnippet>248</a>    /// nothing under test calls into the runtime.
 <a href=#249 id=249 data-nosnippet>249</a>    </span><span class="attr">#[repr(C)]
 <a href=#250 id=250 data-nosnippet>250</a>    </span><span class="kw">struct </span>Transform {
 <a href=#251 id=251 data-nosnippet>251</a>        <span class="attr">#[allow(dead_code)]
@@ -273,140 +273,136 @@
 <a href=#273 id=273 data-nosnippet>273</a>        }
 <a href=#274 id=274 data-nosnippet>274</a>    }
 <a href=#275 id=275 data-nosnippet>275</a>
-<a href=#276 id=276 data-nosnippet>276</a>    <span class="kw">impl </span>Deref <span class="kw">for </span>Transform {
-<a href=#277 id=277 data-nosnippet>277</a>        <span class="kw">type </span>Target = Il2CppObject;
-<a href=#278 id=278 data-nosnippet>278</a>
-<a href=#279 id=279 data-nosnippet>279</a>        <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Il2CppObject {
-<a href=#280 id=280 data-nosnippet>280</a>            <span class="macro">unimplemented!</span>()
-<a href=#281 id=281 data-nosnippet>281</a>        }
-<a href=#282 id=282 data-nosnippet>282</a>    }
-<a href=#283 id=283 data-nosnippet>283</a>
-<a href=#284 id=284 data-nosnippet>284</a>    <span class="kw">impl </span>DerefMut <span class="kw">for </span>Transform {
-<a href=#285 id=285 data-nosnippet>285</a>        <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>Il2CppObject {
-<a href=#286 id=286 data-nosnippet>286</a>            <span class="macro">unimplemented!</span>()
-<a href=#287 id=287 data-nosnippet>287</a>        }
-<a href=#288 id=288 data-nosnippet>288</a>    }
-<a href=#289 id=289 data-nosnippet>289</a>
-<a href=#290 id=290 data-nosnippet>290</a>    <span class="doccomment">/// A stand-in for `UnityEngine.RectTransform`, a real subclass of
-<a href=#291 id=291 data-nosnippet>291</a>    /// `UnityEngine.Transform` - genuinely *embeds* a `Transform` as its
-<a href=#292 id=292 data-nosnippet>292</a>    /// first field (real C# single-inheritance layout), matching `gc.rs`'s
-<a href=#293 id=293 data-nosnippet>293</a>    /// tests, rather than two unrelated types that only coincidentally share
-<a href=#294 id=294 data-nosnippet>294</a>    /// a layout. Gives `type_cast`/`cast`'s `U` type parameter something
-<a href=#295 id=295 data-nosnippet>295</a>    /// concrete to monomorphize against in the tests below.
-<a href=#296 id=296 data-nosnippet>296</a>    </span><span class="attr">#[repr(C)]
-<a href=#297 id=297 data-nosnippet>297</a>    </span><span class="kw">struct </span>RectTransform {
-<a href=#298 id=298 data-nosnippet>298</a>        <span class="attr">#[allow(dead_code)]
-<a href=#299 id=299 data-nosnippet>299</a>        </span>transform: Transform,
-<a href=#300 id=300 data-nosnippet>300</a>    }
-<a href=#301 id=301 data-nosnippet>301</a>
-<a href=#302 id=302 data-nosnippet>302</a>    <span class="kw">unsafe impl </span>Type <span class="kw">for </span>RectTransform {
-<a href=#303 id=303 data-nosnippet>303</a>        <span class="kw">type </span>Held&lt;<span class="lifetime">'a</span>&gt; = <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">'a </span><span class="kw-2">mut </span>RectTransform&gt;;
-<a href=#304 id=304 data-nosnippet>304</a>        <span class="kw">type </span>HeldRaw = <span class="kw-2">*mut </span>RectTransform;
-<a href=#305 id=305 data-nosnippet>305</a>
-<a href=#306 id=306 data-nosnippet>306</a>        <span class="kw">const </span>NAMESPACE: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str = <span class="string">"UnityEngine"</span>;
-<a href=#307 id=307 data-nosnippet>307</a>        <span class="kw">const </span>CLASS_NAME: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str = <span class="string">"RectTransform"</span>;
-<a href=#308 id=308 data-nosnippet>308</a>
-<a href=#309 id=309 data-nosnippet>309</a>        <span class="kw">fn </span>matches_reference_argument(_ty: <span class="kw-2">&amp;</span>Il2CppType) -&gt; bool {
-<a href=#310 id=310 data-nosnippet>310</a>            <span class="macro">unimplemented!</span>()
-<a href=#311 id=311 data-nosnippet>311</a>        }
-<a href=#312 id=312 data-nosnippet>312</a>        <span class="kw">fn </span>matches_value_argument(_ty: <span class="kw-2">&amp;</span>Il2CppType) -&gt; bool {
-<a href=#313 id=313 data-nosnippet>313</a>            <span class="macro">unimplemented!</span>()
-<a href=#314 id=314 data-nosnippet>314</a>        }
-<a href=#315 id=315 data-nosnippet>315</a>        <span class="kw">fn </span>matches_reference_parameter(_ty: <span class="kw-2">&amp;</span>Il2CppType) -&gt; bool {
-<a href=#316 id=316 data-nosnippet>316</a>            <span class="macro">unimplemented!</span>()
-<a href=#317 id=317 data-nosnippet>317</a>        }
-<a href=#318 id=318 data-nosnippet>318</a>        <span class="kw">fn </span>matches_value_parameter(_ty: <span class="kw-2">&amp;</span>Il2CppType) -&gt; bool {
-<a href=#319 id=319 data-nosnippet>319</a>            <span class="macro">unimplemented!</span>()
-<a href=#320 id=320 data-nosnippet>320</a>        }
-<a href=#321 id=321 data-nosnippet>321</a>    }
-<a href=#322 id=322 data-nosnippet>322</a>
-<a href=#323 id=323 data-nosnippet>323</a>    <span class="kw">impl </span>Deref <span class="kw">for </span>RectTransform {
-<a href=#324 id=324 data-nosnippet>324</a>        <span class="kw">type </span>Target = Il2CppObject;
-<a href=#325 id=325 data-nosnippet>325</a>
-<a href=#326 id=326 data-nosnippet>326</a>        <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Il2CppObject {
-<a href=#327 id=327 data-nosnippet>327</a>            <span class="macro">unimplemented!</span>()
-<a href=#328 id=328 data-nosnippet>328</a>        }
-<a href=#329 id=329 data-nosnippet>329</a>    }
-<a href=#330 id=330 data-nosnippet>330</a>
-<a href=#331 id=331 data-nosnippet>331</a>    <span class="kw">impl </span>DerefMut <span class="kw">for </span>RectTransform {
-<a href=#332 id=332 data-nosnippet>332</a>        <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>Il2CppObject {
-<a href=#333 id=333 data-nosnippet>333</a>            <span class="macro">unimplemented!</span>()
-<a href=#334 id=334 data-nosnippet>334</a>        }
-<a href=#335 id=335 data-nosnippet>335</a>    }
-<a href=#336 id=336 data-nosnippet>336</a>
-<a href=#337 id=337 data-nosnippet>337</a>    <span class="kw">impl </span>AsMut&lt;Transform&gt; <span class="kw">for </span>RectTransform {
-<a href=#338 id=338 data-nosnippet>338</a>        <span class="kw">fn </span>as_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>Transform {
-<a href=#339 id=339 data-nosnippet>339</a>            <span class="kw-2">&amp;mut </span><span class="self">self</span>.transform
-<a href=#340 id=340 data-nosnippet>340</a>        }
-<a href=#341 id=341 data-nosnippet>341</a>    }
-<a href=#342 id=342 data-nosnippet>342</a>
-<a href=#343 id=343 data-nosnippet>343</a>    <span class="kw">fn </span>assert_send_sync&lt;T: Send + Sync&gt;() {}
-<a href=#344 id=344 data-nosnippet>344</a>
-<a href=#345 id=345 data-nosnippet>345</a>    <span class="comment">// Most of `SafePtr&lt;T&gt;`'s actual behavior (construction, `Clone`ing a
-<a href=#346 id=346 data-nosnippet>346</a>    // shared root, `Deref`, `up_cast`/`down_cast`) can't be exercised here:
-<a href=#347 id=347 data-nosnippet>347</a>    // `SafePtr::new` calls `GcAllocator::new()`, which needs
-<a href=#348 id=348 data-nosnippet>348</a>    // `GcFunctions::get()` to have been resolved against a *live* il2cpp
-<a href=#349 id=349 data-nosnippet>349</a>    // binary loaded in this process (see `raw::gc::GcFunctions::init`) -
-<a href=#350 id=350 data-nosnippet>350</a>    // nothing a plain `cargo test` run on the host can provide. Even the
-<a href=#351 id=351 data-nosnippet>351</a>    // fixture-backed integration test in `tests/gc_alloc.rs` only goes as
-<a href=#352 id=352 data-nosnippet>352</a>    // far as constructing a `GcAllocator` - it deliberately stops short of
-<a href=#353 id=353 data-nosnippet>353</a>    // actually allocating, since the real GC heap isn't initialized just
-<a href=#354 id=354 data-nosnippet>354</a>    // from loading the library. So what's covered here is only what's true
-<a href=#355 id=355 data-nosnippet>355</a>    // regardless of runtime state: the type-level `Send`/`Sync` contract,
-<a href=#356 id=356 data-nosnippet>356</a>    // and that failing to allocate fails loudly instead of doing something
-<a href=#357 id=357 data-nosnippet>357</a>    // unsound.
-<a href=#358 id=358 data-nosnippet>358</a>
-<a href=#359 id=359 data-nosnippet>359</a>    </span><span class="attr">#[test]
-<a href=#360 id=360 data-nosnippet>360</a>    </span><span class="kw">fn </span>safe_ptr_is_send_and_sync() {
-<a href=#361 id=361 data-nosnippet>361</a>        assert_send_sync::&lt;SafePtr&lt;Transform&gt;&gt;();
-<a href=#362 id=362 data-nosnippet>362</a>    }
-<a href=#363 id=363 data-nosnippet>363</a>
-<a href=#364 id=364 data-nosnippet>364</a>    <span class="attr">#[test]
-<a href=#365 id=365 data-nosnippet>365</a>    </span><span class="kw">fn </span>gc_allocator_new_fails_cleanly_without_a_live_runtime() {
-<a href=#366 id=366 data-nosnippet>366</a>        <span class="comment">// No `GcFunctions::init` has run in this process, so this must
-<a href=#367 id=367 data-nosnippet>367</a>        // report failure rather than e.g. resolving null function pointers.
-<a href=#368 id=368 data-nosnippet>368</a>        </span><span class="macro">assert!</span>(GcAllocator::new().is_err());
-<a href=#369 id=369 data-nosnippet>369</a>    }
-<a href=#370 id=370 data-nosnippet>370</a>
-<a href=#371 id=371 data-nosnippet>371</a>    <span class="attr">#[test]
-<a href=#372 id=372 data-nosnippet>372</a>    #[should_panic(expected = <span class="string">"GcAllocator not initialized"</span>)]
-<a href=#373 id=373 data-nosnippet>373</a>    </span><span class="kw">fn </span>safe_ptr_new_panics_without_a_live_runtime() {
-<a href=#374 id=374 data-nosnippet>374</a>        <span class="kw">let </span><span class="kw-2">mut </span>transform = Transform { value: <span class="number">0 </span>};
-<a href=#375 id=375 data-nosnippet>375</a>        <span class="kw">let </span>gc = Gc::new(<span class="kw-2">&amp;mut </span>transform <span class="kw">as </span><span class="kw-2">*mut </span>Transform);
-<a href=#376 id=376 data-nosnippet>376</a>        <span class="comment">// Panics inside `SafePtr::new` (not UB, not a silent no-op) once it
-<a href=#377 id=377 data-nosnippet>377</a>        // reaches the `GcAllocator::new().expect(...)` call.
-<a href=#378 id=378 data-nosnippet>378</a>        </span><span class="kw">let _ </span>= SafePtr::new(gc);
-<a href=#379 id=379 data-nosnippet>379</a>    }
-<a href=#380 id=380 data-nosnippet>380</a>
-<a href=#381 id=381 data-nosnippet>381</a>    <span class="comment">// `type_cast`/`cast` themselves are even less reachable than the rest of
-<a href=#382 id=382 data-nosnippet>382</a>    // `SafePtr&lt;T&gt;`: both take `&amp;self`, so there's no way to call either
-<a href=#383 id=383 data-nosnippet>383</a>    // without first getting past `SafePtr::new` - which, per the test above,
-<a href=#384 id=384 data-nosnippet>384</a>    // always panics on a plain `cargo test` run. The two tests below can't
-<a href=#385 id=385 data-nosnippet>385</a>    // exercise the casts' *runtime* behavior for that reason, but the calls
-<a href=#386 id=386 data-nosnippet>386</a>    // are still fully monomorphized and typechecked against concrete `U`
-<a href=#387 id=387 data-nosnippet>387</a>    // types even though they never execute - so they still catch a bound or
-<a href=#388 id=388 data-nosnippet>388</a>    // signature regression on `SafePtr::type_cast`/`SafePtr::cast` (the kind
-<a href=#389 id=389 data-nosnippet>389</a>    // this file has drifted into more than once while `Gc&lt;T&gt;`'s own
-<a href=#390 id=390 data-nosnippet>390</a>    // `type_cast`/`cast` were being redesigned).
-<a href=#391 id=391 data-nosnippet>391</a>
-<a href=#392 id=392 data-nosnippet>392</a>    </span><span class="attr">#[test]
-<a href=#393 id=393 data-nosnippet>393</a>    #[should_panic(expected = <span class="string">"GcAllocator not initialized"</span>)]
-<a href=#394 id=394 data-nosnippet>394</a>    </span><span class="kw">fn </span>safe_ptr_type_cast_is_unreachable_without_a_live_runtime() {
-<a href=#395 id=395 data-nosnippet>395</a>        <span class="comment">// Up-casting `RectTransform` to its real base class `Transform`.
-<a href=#396 id=396 data-nosnippet>396</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>rect_transform = RectTransform {
-<a href=#397 id=397 data-nosnippet>397</a>            transform: Transform { value: <span class="number">0 </span>},
-<a href=#398 id=398 data-nosnippet>398</a>        };
-<a href=#399 id=399 data-nosnippet>399</a>        <span class="kw">let </span>gc = Gc::new(<span class="kw-2">&amp;mut </span>rect_transform <span class="kw">as </span><span class="kw-2">*mut </span>RectTransform);
-<a href=#400 id=400 data-nosnippet>400</a>        <span class="kw">let _</span>: SafePtr&lt;Transform&gt; = SafePtr::new(gc).type_cast();
-<a href=#401 id=401 data-nosnippet>401</a>    }
-<a href=#402 id=402 data-nosnippet>402</a>
-<a href=#403 id=403 data-nosnippet>403</a>    <span class="attr">#[test]
-<a href=#404 id=404 data-nosnippet>404</a>    #[should_panic(expected = <span class="string">"GcAllocator not initialized"</span>)]
-<a href=#405 id=405 data-nosnippet>405</a>    </span><span class="kw">fn </span>safe_ptr_cast_is_unreachable_without_a_live_runtime() {
-<a href=#406 id=406 data-nosnippet>406</a>        <span class="comment">// Down-casting a generic `Transform` handle to `RectTransform`.
-<a href=#407 id=407 data-nosnippet>407</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>transform = Transform { value: <span class="number">0 </span>};
-<a href=#408 id=408 data-nosnippet>408</a>        <span class="kw">let </span>gc = Gc::new(<span class="kw-2">&amp;mut </span>transform <span class="kw">as </span><span class="kw-2">*mut </span>Transform);
-<a href=#409 id=409 data-nosnippet>409</a>        <span class="kw">let _</span>: <span class="prelude-ty">Result</span>&lt;SafePtr&lt;RectTransform&gt;, String&gt; = SafePtr::new(gc).cast();
-<a href=#410 id=410 data-nosnippet>410</a>    }
-<a href=#411 id=411 data-nosnippet>411</a>}
+<a href=#276 id=276 data-nosnippet>276</a>    <span class="kw">impl </span>AsRef&lt;Il2CppObject&gt; <span class="kw">for </span>Transform {
+<a href=#277 id=277 data-nosnippet>277</a>        <span class="kw">fn </span>as_ref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Il2CppObject {
+<a href=#278 id=278 data-nosnippet>278</a>            <span class="macro">unimplemented!</span>()
+<a href=#279 id=279 data-nosnippet>279</a>        }
+<a href=#280 id=280 data-nosnippet>280</a>    }
+<a href=#281 id=281 data-nosnippet>281</a>
+<a href=#282 id=282 data-nosnippet>282</a>    <span class="kw">impl </span>AsMut&lt;Il2CppObject&gt; <span class="kw">for </span>Transform {
+<a href=#283 id=283 data-nosnippet>283</a>        <span class="kw">fn </span>as_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>Il2CppObject {
+<a href=#284 id=284 data-nosnippet>284</a>            <span class="macro">unimplemented!</span>()
+<a href=#285 id=285 data-nosnippet>285</a>        }
+<a href=#286 id=286 data-nosnippet>286</a>    }
+<a href=#287 id=287 data-nosnippet>287</a>
+<a href=#288 id=288 data-nosnippet>288</a>    <span class="doccomment">/// A stand-in for `UnityEngine.RectTransform`, a real subclass of
+<a href=#289 id=289 data-nosnippet>289</a>    /// `UnityEngine.Transform` - genuinely *embeds* a `Transform` as its
+<a href=#290 id=290 data-nosnippet>290</a>    /// first field (real C# single-inheritance layout), matching `gc.rs`'s
+<a href=#291 id=291 data-nosnippet>291</a>    /// tests, rather than two unrelated types that only coincidentally share
+<a href=#292 id=292 data-nosnippet>292</a>    /// a layout. Gives `type_cast`/`cast`'s `U` type parameter something
+<a href=#293 id=293 data-nosnippet>293</a>    /// concrete to monomorphize against in the tests below.
+<a href=#294 id=294 data-nosnippet>294</a>    </span><span class="attr">#[repr(C)]
+<a href=#295 id=295 data-nosnippet>295</a>    </span><span class="kw">struct </span>RectTransform {
+<a href=#296 id=296 data-nosnippet>296</a>        <span class="attr">#[allow(dead_code)]
+<a href=#297 id=297 data-nosnippet>297</a>        </span>transform: Transform,
+<a href=#298 id=298 data-nosnippet>298</a>    }
+<a href=#299 id=299 data-nosnippet>299</a>
+<a href=#300 id=300 data-nosnippet>300</a>    <span class="kw">unsafe impl </span>Type <span class="kw">for </span>RectTransform {
+<a href=#301 id=301 data-nosnippet>301</a>        <span class="kw">type </span>Held&lt;<span class="lifetime">'a</span>&gt; = <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">'a </span><span class="kw-2">mut </span>RectTransform&gt;;
+<a href=#302 id=302 data-nosnippet>302</a>        <span class="kw">type </span>HeldRaw = <span class="kw-2">*mut </span>RectTransform;
+<a href=#303 id=303 data-nosnippet>303</a>
+<a href=#304 id=304 data-nosnippet>304</a>        <span class="kw">const </span>NAMESPACE: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str = <span class="string">"UnityEngine"</span>;
+<a href=#305 id=305 data-nosnippet>305</a>        <span class="kw">const </span>CLASS_NAME: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str = <span class="string">"RectTransform"</span>;
+<a href=#306 id=306 data-nosnippet>306</a>
+<a href=#307 id=307 data-nosnippet>307</a>        <span class="kw">fn </span>matches_reference_argument(_ty: <span class="kw-2">&amp;</span>Il2CppType) -&gt; bool {
+<a href=#308 id=308 data-nosnippet>308</a>            <span class="macro">unimplemented!</span>()
+<a href=#309 id=309 data-nosnippet>309</a>        }
+<a href=#310 id=310 data-nosnippet>310</a>        <span class="kw">fn </span>matches_value_argument(_ty: <span class="kw-2">&amp;</span>Il2CppType) -&gt; bool {
+<a href=#311 id=311 data-nosnippet>311</a>            <span class="macro">unimplemented!</span>()
+<a href=#312 id=312 data-nosnippet>312</a>        }
+<a href=#313 id=313 data-nosnippet>313</a>        <span class="kw">fn </span>matches_reference_parameter(_ty: <span class="kw-2">&amp;</span>Il2CppType) -&gt; bool {
+<a href=#314 id=314 data-nosnippet>314</a>            <span class="macro">unimplemented!</span>()
+<a href=#315 id=315 data-nosnippet>315</a>        }
+<a href=#316 id=316 data-nosnippet>316</a>        <span class="kw">fn </span>matches_value_parameter(_ty: <span class="kw-2">&amp;</span>Il2CppType) -&gt; bool {
+<a href=#317 id=317 data-nosnippet>317</a>            <span class="macro">unimplemented!</span>()
+<a href=#318 id=318 data-nosnippet>318</a>        }
+<a href=#319 id=319 data-nosnippet>319</a>    }
+<a href=#320 id=320 data-nosnippet>320</a>
+<a href=#321 id=321 data-nosnippet>321</a>    <span class="kw">impl </span>AsRef&lt;Il2CppObject&gt; <span class="kw">for </span>RectTransform {
+<a href=#322 id=322 data-nosnippet>322</a>        <span class="kw">fn </span>as_ref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Il2CppObject {
+<a href=#323 id=323 data-nosnippet>323</a>            <span class="macro">unimplemented!</span>()
+<a href=#324 id=324 data-nosnippet>324</a>        }
+<a href=#325 id=325 data-nosnippet>325</a>    }
+<a href=#326 id=326 data-nosnippet>326</a>
+<a href=#327 id=327 data-nosnippet>327</a>    <span class="kw">impl </span>AsMut&lt;Il2CppObject&gt; <span class="kw">for </span>RectTransform {
+<a href=#328 id=328 data-nosnippet>328</a>        <span class="kw">fn </span>as_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>Il2CppObject {
+<a href=#329 id=329 data-nosnippet>329</a>            <span class="macro">unimplemented!</span>()
+<a href=#330 id=330 data-nosnippet>330</a>        }
+<a href=#331 id=331 data-nosnippet>331</a>    }
+<a href=#332 id=332 data-nosnippet>332</a>
+<a href=#333 id=333 data-nosnippet>333</a>    <span class="kw">impl </span>AsMut&lt;Transform&gt; <span class="kw">for </span>RectTransform {
+<a href=#334 id=334 data-nosnippet>334</a>        <span class="kw">fn </span>as_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>Transform {
+<a href=#335 id=335 data-nosnippet>335</a>            <span class="kw-2">&amp;mut </span><span class="self">self</span>.transform
+<a href=#336 id=336 data-nosnippet>336</a>        }
+<a href=#337 id=337 data-nosnippet>337</a>    }
+<a href=#338 id=338 data-nosnippet>338</a>
+<a href=#339 id=339 data-nosnippet>339</a>    <span class="kw">fn </span>assert_send_sync&lt;T: Send + Sync&gt;() {}
+<a href=#340 id=340 data-nosnippet>340</a>
+<a href=#341 id=341 data-nosnippet>341</a>    <span class="comment">// Most of `SafePtr&lt;T&gt;`'s actual behavior (construction, `Clone`ing a
+<a href=#342 id=342 data-nosnippet>342</a>    // shared root, `Deref`, `up_cast`/`down_cast`) can't be exercised here:
+<a href=#343 id=343 data-nosnippet>343</a>    // `SafePtr::new` calls `GcAllocator::new()`, which needs
+<a href=#344 id=344 data-nosnippet>344</a>    // `GcFunctions::get()` to have been resolved against a *live* il2cpp
+<a href=#345 id=345 data-nosnippet>345</a>    // binary loaded in this process (see `raw::gc::GcFunctions::init`) -
+<a href=#346 id=346 data-nosnippet>346</a>    // nothing a plain `cargo test` run on the host can provide. Even the
+<a href=#347 id=347 data-nosnippet>347</a>    // fixture-backed integration test in `tests/gc_alloc.rs` only goes as
+<a href=#348 id=348 data-nosnippet>348</a>    // far as constructing a `GcAllocator` - it deliberately stops short of
+<a href=#349 id=349 data-nosnippet>349</a>    // actually allocating, since the real GC heap isn't initialized just
+<a href=#350 id=350 data-nosnippet>350</a>    // from loading the library. So what's covered here is only what's true
+<a href=#351 id=351 data-nosnippet>351</a>    // regardless of runtime state: the type-level `Send`/`Sync` contract,
+<a href=#352 id=352 data-nosnippet>352</a>    // and that failing to allocate fails loudly instead of doing something
+<a href=#353 id=353 data-nosnippet>353</a>    // unsound.
+<a href=#354 id=354 data-nosnippet>354</a>
+<a href=#355 id=355 data-nosnippet>355</a>    </span><span class="attr">#[test]
+<a href=#356 id=356 data-nosnippet>356</a>    </span><span class="kw">fn </span>safe_ptr_is_send_and_sync() {
+<a href=#357 id=357 data-nosnippet>357</a>        assert_send_sync::&lt;SafePtr&lt;Transform&gt;&gt;();
+<a href=#358 id=358 data-nosnippet>358</a>    }
+<a href=#359 id=359 data-nosnippet>359</a>
+<a href=#360 id=360 data-nosnippet>360</a>    <span class="attr">#[test]
+<a href=#361 id=361 data-nosnippet>361</a>    </span><span class="kw">fn </span>gc_allocator_new_fails_cleanly_without_a_live_runtime() {
+<a href=#362 id=362 data-nosnippet>362</a>        <span class="comment">// No `GcFunctions::init` has run in this process, so this must
+<a href=#363 id=363 data-nosnippet>363</a>        // report failure rather than e.g. resolving null function pointers.
+<a href=#364 id=364 data-nosnippet>364</a>        </span><span class="macro">assert!</span>(GcAllocator::new().is_err());
+<a href=#365 id=365 data-nosnippet>365</a>    }
+<a href=#366 id=366 data-nosnippet>366</a>
+<a href=#367 id=367 data-nosnippet>367</a>    <span class="attr">#[test]
+<a href=#368 id=368 data-nosnippet>368</a>    #[should_panic(expected = <span class="string">"GcAllocator not initialized"</span>)]
+<a href=#369 id=369 data-nosnippet>369</a>    </span><span class="kw">fn </span>safe_ptr_new_panics_without_a_live_runtime() {
+<a href=#370 id=370 data-nosnippet>370</a>        <span class="kw">let </span><span class="kw-2">mut </span>transform = Transform { value: <span class="number">0 </span>};
+<a href=#371 id=371 data-nosnippet>371</a>        <span class="kw">let </span>gc = Gc::new(<span class="kw-2">&amp;mut </span>transform <span class="kw">as </span><span class="kw-2">*mut </span>Transform);
+<a href=#372 id=372 data-nosnippet>372</a>        <span class="comment">// Panics inside `SafePtr::new` (not UB, not a silent no-op) once it
+<a href=#373 id=373 data-nosnippet>373</a>        // reaches the `GcAllocator::new().expect(...)` call.
+<a href=#374 id=374 data-nosnippet>374</a>        </span><span class="kw">let _ </span>= SafePtr::new(gc);
+<a href=#375 id=375 data-nosnippet>375</a>    }
+<a href=#376 id=376 data-nosnippet>376</a>
+<a href=#377 id=377 data-nosnippet>377</a>    <span class="comment">// `type_cast`/`cast` themselves are even less reachable than the rest of
+<a href=#378 id=378 data-nosnippet>378</a>    // `SafePtr&lt;T&gt;`: both take `&amp;self`, so there's no way to call either
+<a href=#379 id=379 data-nosnippet>379</a>    // without first getting past `SafePtr::new` - which, per the test above,
+<a href=#380 id=380 data-nosnippet>380</a>    // always panics on a plain `cargo test` run. The two tests below can't
+<a href=#381 id=381 data-nosnippet>381</a>    // exercise the casts' *runtime* behavior for that reason, but the calls
+<a href=#382 id=382 data-nosnippet>382</a>    // are still fully monomorphized and typechecked against concrete `U`
+<a href=#383 id=383 data-nosnippet>383</a>    // types even though they never execute - so they still catch a bound or
+<a href=#384 id=384 data-nosnippet>384</a>    // signature regression on `SafePtr::type_cast`/`SafePtr::cast` (the kind
+<a href=#385 id=385 data-nosnippet>385</a>    // this file has drifted into more than once while `Gc&lt;T&gt;`'s own
+<a href=#386 id=386 data-nosnippet>386</a>    // `type_cast`/`cast` were being redesigned).
+<a href=#387 id=387 data-nosnippet>387</a>
+<a href=#388 id=388 data-nosnippet>388</a>    </span><span class="attr">#[test]
+<a href=#389 id=389 data-nosnippet>389</a>    #[should_panic(expected = <span class="string">"GcAllocator not initialized"</span>)]
+<a href=#390 id=390 data-nosnippet>390</a>    </span><span class="kw">fn </span>safe_ptr_type_cast_is_unreachable_without_a_live_runtime() {
+<a href=#391 id=391 data-nosnippet>391</a>        <span class="comment">// Up-casting `RectTransform` to its real base class `Transform`.
+<a href=#392 id=392 data-nosnippet>392</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>rect_transform = RectTransform {
+<a href=#393 id=393 data-nosnippet>393</a>            transform: Transform { value: <span class="number">0 </span>},
+<a href=#394 id=394 data-nosnippet>394</a>        };
+<a href=#395 id=395 data-nosnippet>395</a>        <span class="kw">let </span>gc = Gc::new(<span class="kw-2">&amp;mut </span>rect_transform <span class="kw">as </span><span class="kw-2">*mut </span>RectTransform);
+<a href=#396 id=396 data-nosnippet>396</a>        <span class="kw">let _</span>: SafePtr&lt;Transform&gt; = SafePtr::new(gc).type_cast();
+<a href=#397 id=397 data-nosnippet>397</a>    }
+<a href=#398 id=398 data-nosnippet>398</a>
+<a href=#399 id=399 data-nosnippet>399</a>    <span class="attr">#[test]
+<a href=#400 id=400 data-nosnippet>400</a>    #[should_panic(expected = <span class="string">"GcAllocator not initialized"</span>)]
+<a href=#401 id=401 data-nosnippet>401</a>    </span><span class="kw">fn </span>safe_ptr_cast_is_unreachable_without_a_live_runtime() {
+<a href=#402 id=402 data-nosnippet>402</a>        <span class="comment">// Down-casting a generic `Transform` handle to `RectTransform`.
+<a href=#403 id=403 data-nosnippet>403</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>transform = Transform { value: <span class="number">0 </span>};
+<a href=#404 id=404 data-nosnippet>404</a>        <span class="kw">let </span>gc = Gc::new(<span class="kw-2">&amp;mut </span>transform <span class="kw">as </span><span class="kw-2">*mut </span>Transform);
+<a href=#405 id=405 data-nosnippet>405</a>        <span class="kw">let _</span>: <span class="prelude-ty">Result</span>&lt;SafePtr&lt;RectTransform&gt;, String&gt; = SafePtr::new(gc).cast();
+<a href=#406 id=406 data-nosnippet>406</a>    }
+<a href=#407 id=407 data-nosnippet>407</a>}
 </code></pre></div></section></main></body></html>
